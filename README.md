@@ -188,3 +188,9 @@ Thank you to the Codex and T3Code teams for pushing the boundaries of what AI-as
 MIT
 
 © 2026 Kirodex. All rights reserved.
+
+---
+
+> Why did the Tauri app break up with Electron? It said, "You're taking up too much space in this relationship."
+>
+> Why did the AI agent refuse to use `unwrap()`? It didn't want to panic in production.

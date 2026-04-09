@@ -32,6 +32,20 @@ Replaced all "new project" / "start project" / "add project" copy with import-or
 - `src/renderer/components/sidebar/TaskSidebar.tsx`
 - `src/renderer/components/task/NewProjectSheet.tsx`
 
+## 2026-04-09 23:58 GST (Dubai, UTC+4)
+
+### Collapsible file sidebar in DiffViewer
+
+Made the DiffViewer file list sidebar drag-to-resize and toggleable:
+- Drag the right edge to resize (100px min, 320px max)
+- Dragging below 60px auto-collapses the sidebar
+- Toggle button (PanelLeftOpen/PanelLeftClose) in the toolbar
+- Sidebar state is local (no Zustand needed)
+
+**Build:** `tsc --noEmit` ✓ | `vite build` ✓ (1.34s)
+
+**Modified:** `src/renderer/components/code/DiffViewer.tsx`
+
 ## 2026-04-09 23:47 GST (Dubai, UTC+4)
 
 ### Extracted ChatInput logic into three custom hooks
@@ -656,3 +670,6 @@ Added drag-and-drop, paste, and file picker support for attaching files and imag
   - Lazy-loaded 6 heavy components via `React.lazy()`: ChatPanel, Playground, CodePanel, DebugPanel, SettingsPanel, Onboarding
   - Main index chunk: 231KB (down from 1,385KB — 83% reduction)
   - Modified: `package.json`, `vite.config.ts`, `App.tsx`
+
+## 2026-04-09 23:57 (Dubai)
+- Added joke to README.md footer: "Why did the AI agent refuse to use `unwrap()`? It didn't want to panic in production."
