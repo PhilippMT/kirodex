@@ -1,5 +1,67 @@
 # Activity Log
 
+## 2026-04-09 23:40 GST (Dubai, UTC+4)
+
+### Updated UI copy from "new project" to "import" language and bumped version to 0.6.0
+
+Replaced all "new project" / "start project" / "add project" copy with import-oriented language across the app. Bumped version from 0.1.0 to 0.6.0 in all three manifests. Added version display to settings panel.
+
+**Copy changes:**
+- App.tsx: "Open a project folder to get started" → "Import a project folder to get started"
+- App.tsx: "Start New Project" → "Import Project"
+- Dashboard.tsx: "Pick a project folder to start a new thread with Kiro." → "Import a project folder to start a new thread with Kiro."
+- TaskSidebar.tsx: "Add project folder" tooltip → "Import project folder"
+- TaskSidebar.tsx: "No projects yet — click + to add a folder" → "No projects yet — click + to import a folder"
+- NewProjectSheet.tsx: JSDoc updated to "imports" instead of "adds"
+
+**Version bump (0.1.0 → 0.6.0):**
+- `package.json`
+- `src-tauri/tauri.conf.json`
+- `src-tauri/Cargo.toml`
+
+**Settings version label:**
+- Added "Kirodex v0.6.0" text to the settings panel footer below the Save/Cancel buttons
+
+**Modified files:**
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+- `src/renderer/App.tsx`
+- `src/renderer/components/dashboard/Dashboard.tsx`
+- `src/renderer/components/settings/SettingsPanel.tsx`
+- `src/renderer/components/sidebar/TaskSidebar.tsx`
+- `src/renderer/components/task/NewProjectSheet.tsx`
+
+## 2026-04-09 23:47 GST (Dubai, UTC+4)
+
+### Extracted ChatInput logic into three custom hooks
+
+ChatInput.tsx was 17KB with eight useState calls, six useCallback handlers, two useEffect side effects, and one useMemo. Extracted all logic into composable hooks; ChatInput is now pure rendering.
+
+**useAttachments** (`src/renderer/hooks/useAttachments.ts`):
+- Owns: `attachments`, `isDragOver`, `fileInputRef`
+- Handles: Tauri native drag-drop listener, clipboard paste, file picker, remove
+
+**useFileMention** (`src/renderer/hooks/useFileMention.ts`):
+- Owns: `mentionTrigger`, `mentionIndex`, `mentionedFiles`
+- Handles: @-mention detection from cursor position, file selection, mention removal
+
+**useChatInput** (`src/renderer/hooks/useChatInput.ts`):
+- Composes `useAttachments` + `useFileMention`
+- Owns: `value`, `slashIndex`, `commands`, textarea resize
+- Handles: onChange, onKeyDown, onSelect, send, slash command selection
+- Returns flat object with everything ChatInput.tsx needs
+
+**ChatInput.tsx**: zero useState, zero useCallback, zero useEffect, zero useMemo. Pure rendering only.
+
+**Build:** `tsc --noEmit` ✓ (0 errors) | `vite build` ✓ (built in 1.15s)
+
+**Modified:**
+- `src/renderer/hooks/useAttachments.ts` (new)
+- `src/renderer/hooks/useFileMention.ts` (new)
+- `src/renderer/hooks/useChatInput.ts` (new)
+- `src/renderer/components/chat/ChatInput.tsx`
+
 ## 2026-04-09 23:25 GST (Dubai, UTC+4)
 
 ### Refactored chat panel components into flat single-file structure
