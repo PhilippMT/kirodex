@@ -1,7 +1,7 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { parsePatchFiles, type FileDiffMetadata } from '@pierre/diffs'
 import { FileDiff, Virtualizer } from '@pierre/diffs/react'
-import { Columns2, Rows2, WrapText, FileCode, ChevronDown, ChevronRight, Plus, Undo2, ExternalLink } from 'lucide-react'
+import { Columns2, Rows2, WrapText, FileCode, ChevronDown, ChevronRight, Plus, Undo2, ExternalLink, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ipc } from '@/lib/ipc'
 import { useDiffStore } from '@/stores/diffStore'
@@ -173,6 +173,35 @@ export function DiffViewer({ diff, taskId, workspace, onRefreshDiff }: DiffViewe
   const [selectedFileIdx, setSelectedFileIdx] = useState<number | null>(null)
   const [collapsedFiles, setCollapsedFiles] = useState<Set<number>>(new Set())
   const [revertIdx, setRevertIdx] = useState<number | null>(null)
+  const [sidebarWidth, setSidebarWidth] = useState(176)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true)
+  const sidebarDragRef = useRef<{ startX: number; startW: number } | null>(null)
+
+  const MIN_SIDEBAR = 100
+  const COLLAPSE_THRESHOLD = 60
+
+  const handleSidebarDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    sidebarDragRef.current = { startX: e.clientX, startW: sidebarWidth }
+    const onMove = (ev: MouseEvent) => {
+      if (!sidebarDragRef.current) return
+      const delta = ev.clientX - sidebarDragRef.current.startX
+      const newWidth = sidebarDragRef.current.startW + delta
+      if (newWidth < COLLAPSE_THRESHOLD) {
+        setIsSidebarCollapsed(true)
+      } else {
+        setIsSidebarCollapsed(false)
+        setSidebarWidth(Math.max(MIN_SIDEBAR, Math.min(320, newWidth)))
+      }
+    }
+    const onUp = () => {
+      sidebarDragRef.current = null
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [sidebarWidth])
 
   // Parse the unified diff into FileDiffMetadata[]
   const parsedFiles = useMemo(() => {
@@ -266,6 +295,17 @@ export function DiffViewer({ diff, taskId, workspace, onRefreshDiff }: DiffViewe
 
         <button
           type="button"
+          onClick={() => setIsSidebarCollapsed((v) => !v)}
+          title={isSidebarCollapsed ? 'Show file list' : 'Hide file list'}
+          className={cn(
+            'flex size-5 items-center justify-center rounded transition-colors',
+            isSidebarCollapsed ? 'text-muted-foreground/50 hover:text-foreground' : 'bg-accent text-foreground',
+          )}
+        >
+          {isSidebarCollapsed ? <PanelLeftOpen className="size-3" /> : <PanelLeftClose className="size-3" />}
+        </button>
+        <button
+          type="button"
           onClick={() => setDiffStyle('unified')}
           title="Unified view"
           className={cn(
@@ -301,36 +341,45 @@ export function DiffViewer({ diff, taskId, workspace, onRefreshDiff }: DiffViewe
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* File list sidebar */}
-        <div className="w-44 shrink-0 border-r overflow-y-auto min-h-0">
-          <button
-            type="button"
-            onClick={clearSelection}
-            className={cn(
-              'flex w-full items-center gap-1.5 px-2 py-1 text-[10px] font-medium border-b transition-colors',
-              selectedFileIdx === null ? 'bg-accent/30 text-foreground' : 'text-muted-foreground hover:bg-accent/10',
-            )}
-          >
-            All files ({parsedFiles.length})
-          </button>
-          {fileStats.map((file, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setSelectedFileIdx(i)}
-              className={cn(
-                'flex items-center gap-1 w-full px-2 py-1 text-[10px] hover:bg-accent/10 truncate transition-colors',
-                selectedFileIdx === i && 'bg-accent/30 text-foreground',
-              )}
-            >
-              <FileCode className="size-3 shrink-0 text-muted-foreground/50" />
-              <span className="min-w-0 flex-1 truncate">{file.name.split('/').pop()}</span>
-              <span className="shrink-0 flex gap-1">
-                {file.additions > 0 && <span className="text-emerald-400">+{file.additions}</span>}
-                {file.deletions > 0 && <span className="text-red-400">-{file.deletions}</span>}
-              </span>
-            </button>
-          ))}
-        </div>
+        {!isSidebarCollapsed && (
+          <div className="shrink-0 flex min-h-0" style={{ width: sidebarWidth }}>
+            <div className="flex flex-1 min-w-0 flex-col overflow-y-auto">
+              <button
+                type="button"
+                onClick={clearSelection}
+                className={cn(
+                  'flex w-full items-center gap-1.5 px-2 py-1 text-[10px] font-medium border-b transition-colors',
+                  selectedFileIdx === null ? 'bg-accent/30 text-foreground' : 'text-muted-foreground hover:bg-accent/10',
+                )}
+              >
+                All files ({parsedFiles.length})
+              </button>
+              {fileStats.map((file, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setSelectedFileIdx(i)}
+                  className={cn(
+                    'flex items-center gap-1 w-full px-2 py-1 text-[10px] hover:bg-accent/10 truncate transition-colors',
+                    selectedFileIdx === i && 'bg-accent/30 text-foreground',
+                  )}
+                >
+                  <FileCode className="size-3 shrink-0 text-muted-foreground/50" />
+                  <span className="min-w-0 flex-1 truncate">{file.name.split('/').pop()}</span>
+                  <span className="shrink-0 flex gap-1">
+                    {file.additions > 0 && <span className="text-emerald-400">+{file.additions}</span>}
+                    {file.deletions > 0 && <span className="text-red-400">-{file.deletions}</span>}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {/* Drag handle */}
+            <div
+              onMouseDown={handleSidebarDragStart}
+              className="w-1 shrink-0 cursor-col-resize border-r hover:bg-accent/40 transition-colors"
+            />
+          </div>
+        )}
 
         {/* Diff content */}
         <div className="flex-1 min-w-0 overflow-auto">
