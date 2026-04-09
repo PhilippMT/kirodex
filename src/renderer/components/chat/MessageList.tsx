@@ -2,9 +2,24 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ArrowDown } from 'lucide-react'
 import type { TaskMessage, ToolCall } from '@/types'
-import { MessageItem } from './MessageItem'
+import { deriveTimeline, type TimelineRow } from '@/lib/timeline'
+import {
+  UserMessageRow,
+  SystemMessageRow,
+  AssistantTextRow,
+  WorkGroupRow,
+  WorkingRow,
+} from './TimelineRows'
 
 const AUTO_SCROLL_THRESHOLD = 150
+
+const ROW_ESTIMATES: Record<TimelineRow['kind'], number> = {
+  'user-message': 60,
+  'system-message': 60,
+  'assistant-text': 80,
+  'work': 40,
+  'working': 40,
+}
 
 interface MessageListProps {
   messages: TaskMessage[]
@@ -25,27 +40,17 @@ export const MessageList = memo(function MessageList({
   const [showScrollBtn, setShowScrollBtn] = useState(false)
   const isNearBottomRef = useRef(true)
 
-  const displayMessages = useMemo(() => {
-    const msgs: Array<TaskMessage & { _streaming?: boolean }> = [...messages]
-    const hasLiveActivity = !!streamingChunk || (liveToolCalls && liveToolCalls.length > 0) || !!liveThinking
-    const lastMsg = messages[messages.length - 1]
-    const waitingForResponse = isRunning && !hasLiveActivity && lastMsg?.role === 'user'
-    if (hasLiveActivity || waitingForResponse) {
-      msgs.push({
-        role: 'assistant',
-        content: streamingChunk ?? '',
-        timestamp: '',
-        _streaming: true,
-      } as TaskMessage & { _streaming?: boolean })
-    }
-    return msgs
-  }, [messages, streamingChunk, liveToolCalls, liveThinking, isRunning])
+  const timelineRows = useMemo(
+    () => deriveTimeline(messages, streamingChunk, liveToolCalls, liveThinking, isRunning),
+    [messages, streamingChunk, liveToolCalls, liveThinking, isRunning],
+  )
 
   const virtualizer = useVirtualizer({
-    count: displayMessages.length,
+    count: timelineRows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 80,
+    estimateSize: (index) => ROW_ESTIMATES[timelineRows[index]?.kind ?? 'assistant-text'],
     overscan: 5,
+    getItemKey: (index) => timelineRows[index]?.id ?? index,
   })
 
   const scrollToBottom = useCallback(() => {
@@ -70,9 +75,9 @@ export const MessageList = memo(function MessageList({
     if (isNearBottomRef.current) {
       requestAnimationFrame(scrollToBottom)
     }
-  }, [displayMessages.length, streamingChunk, liveToolCalls, liveThinking, scrollToBottom])
+  }, [timelineRows.length, streamingChunk, liveToolCalls, liveThinking, scrollToBottom])
 
-  if (!displayMessages.length) {
+  if (!timelineRows.length) {
     return (
       <div className="flex flex-1 items-center justify-center text-muted-foreground">
         <p className="text-sm">Send a message to start the conversation.</p>
@@ -81,15 +86,14 @@ export const MessageList = memo(function MessageList({
   }
 
   return (
-    <div ref={parentRef} className="relative flex-1 overflow-auto overscroll-y-contain px-0 py-3 sm:py-4">
+    <div ref={parentRef} className="relative min-h-0 flex-1 overflow-auto overscroll-y-contain px-0 py-3 sm:py-4">
       <div
         className="relative w-full"
         style={{ height: `${virtualizer.getTotalSize()}px` }}
       >
         {virtualizer.getVirtualItems().map((virtualRow) => {
-          const msg = displayMessages[virtualRow.index]
-          if (!msg) return null
-          const isStreaming = '_streaming' in msg && (msg as { _streaming?: boolean })._streaming
+          const row = timelineRows[virtualRow.index]
+          if (!row) return null
           return (
             <div
               key={virtualRow.key}
@@ -98,13 +102,8 @@ export const MessageList = memo(function MessageList({
               className="absolute left-0 top-0 w-full"
               style={{ transform: `translateY(${virtualRow.start}px)` }}
             >
-              <div className="mx-auto w-full min-w-0 max-w-3xl overflow-x-hidden px-3 sm:px-5">
-                <MessageItem
-                  message={msg}
-                  streaming={!!isStreaming}
-                  liveToolCalls={isStreaming ? liveToolCalls : undefined}
-                  liveThinking={isStreaming ? liveThinking : undefined}
-                />
+              <div className="mx-auto w-full min-w-0 max-w-2xl overflow-x-hidden px-4 sm:px-6 lg:max-w-3xl xl:max-w-4xl">
+                <TimelineRowRenderer row={row} />
               </div>
             </div>
           )
@@ -123,4 +122,21 @@ export const MessageList = memo(function MessageList({
       )}
     </div>
   )
+})
+
+// ── Row dispatcher ────────────────────────────────────────────
+
+const TimelineRowRenderer = memo(function TimelineRowRenderer({ row }: { row: TimelineRow }) {
+  switch (row.kind) {
+    case 'user-message':
+      return <UserMessageRow row={row} />
+    case 'system-message':
+      return <SystemMessageRow row={row} />
+    case 'assistant-text':
+      return <AssistantTextRow row={row} />
+    case 'work':
+      return <WorkGroupRow row={row} />
+    case 'working':
+      return <WorkingRow />
+  }
 })

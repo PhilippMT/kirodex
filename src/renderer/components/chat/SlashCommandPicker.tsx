@@ -2,31 +2,70 @@ import { memo, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import type { SlashCommand } from '@/stores/settingsStore'
 
-// ── Tabler-style icons per command ──────────────────────────────────
+// Strip leading slash from command name (ACP sends "/agent", we display "/agent" ourselves)
+const displayName = (name: string): string => name.replace(/^\/+/, '')
+
+// ── Kiro-accurate descriptions (fallback when ACP description is generic) ──
+const COMMAND_DESCRIPTIONS: Record<string, string> = {
+  agent: 'Switch between agents or list available ones',
+  chat: 'Save, load, or manage chat sessions',
+  clear: 'Clear the current conversation',
+  code: 'Initialize or manage code intelligence workspace',
+  compact: 'Summarize conversation to free up context',
+  context: 'Manage context files or view token usage',
+  feedback: 'Submit feedback, request features, or report issues',
+  help: 'Get help with Kiro CLI features and commands',
+  knowledge: 'Add, search, or manage your knowledge base',
+  model: 'Switch the active AI model',
+  plan: 'Start the planning agent to design before building',
+  prompts: 'Manage reusable prompt templates',
+  tools: 'View or configure available tools',
+  usage: 'Show token and cost usage for this session',
+}
+
+// ── Per-command SVG icons ───────────────────────────────────────────
+const icon = (d: string) => () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d={d} />
+  </svg>
+)
+
 const COMMAND_ICONS: Record<string, () => React.ReactNode> = {
-  compact: () => (
+  agent: () => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M4 6h16M4 12h10M4 18h6" />
+      <circle cx="12" cy="8" r="4" /><path d="M20 21a8 8 0 0 0-16 0" />
     </svg>
   ),
+  chat: icon('M7.9 20A9 9 0 1 0 4 16.1L2 22z'),
+  clear: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M5 6l1 14h12l1-14" />
+    </svg>
+  ),
+  code: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+    </svg>
+  ),
+  compact: icon('M4 6h16M4 12h10M4 18h6'),
   context: () => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <circle cx="12" cy="12" r="9" /><path d="M12 8v4l3 3" />
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+    </svg>
+  ),
+  feedback: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
   ),
   help: () => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <circle cx="12" cy="12" r="9" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><circle cx="12" cy="17" r=".5" fill="currentColor" />
+      <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><circle cx="12" cy="17" r=".5" fill="currentColor" />
     </svg>
   ),
-  tools: () => (
+  knowledge: () => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-    </svg>
-  ),
-  usage: () => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M3 3v18h18" /><path d="M18 9l-5 5-4-4-3 3" />
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
     </svg>
   ),
   model: () => (
@@ -39,22 +78,31 @@ const COMMAND_ICONS: Record<string, () => React.ReactNode> = {
       <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M8 7h8M8 12h8M8 17h4" />
     </svg>
   ),
-  default: () => (
+  prompts: () => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z" />
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
+  ),
+  tools: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+    </svg>
+  ),
+  usage: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 3v18h18" /><path d="M18 9l-5 5-4-4-3 3" />
     </svg>
   ),
 }
 
 const DefaultIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
-    <rect x="9" y="3" width="6" height="4" rx="1" />
+    <path d="M4 17l6-6-6-6" /><path d="M12 19h8" />
   </svg>
 )
 
 interface SlashCommandPickerProps {
-  query: string          // text after the /
+  query: string
   commands: SlashCommand[]
   onSelect: (cmd: SlashCommand) => void
   onDismiss: () => void
@@ -65,18 +113,14 @@ export const SlashCommandPicker = memo(function SlashCommandPicker({
   query, commands, onSelect, onDismiss, activeIndex,
 }: SlashCommandPickerProps) {
   const listRef = useRef<HTMLUListElement>(null)
-
   const filtered = query
-    ? commands.filter((c) => c.name.toLowerCase().startsWith(query.toLowerCase()))
+    ? commands.filter((c) => displayName(c.name).toLowerCase().startsWith(query.toLowerCase()))
     : commands
-
   useEffect(() => {
     const el = listRef.current?.children[activeIndex] as HTMLElement | undefined
     el?.scrollIntoView({ block: 'nearest' })
   }, [activeIndex])
-
   if (filtered.length === 0) return null
-
   return (
     <div
       className="absolute bottom-full left-0 right-0 z-[300] mb-2 overflow-hidden rounded-xl border border-border bg-popover shadow-xl"
@@ -85,7 +129,9 @@ export const SlashCommandPicker = memo(function SlashCommandPicker({
     >
       <ul ref={listRef} className="max-h-[240px] overflow-y-auto py-1">
         {filtered.map((cmd, i) => {
-          const Icon = COMMAND_ICONS[cmd.name] ?? DefaultIcon
+          const name = displayName(cmd.name)
+          const Icon = COMMAND_ICONS[name] ?? DefaultIcon
+          const description = COMMAND_DESCRIPTIONS[name] ?? cmd.description ?? ''
           const isActive = i === activeIndex % filtered.length
           return (
             <li
@@ -101,9 +147,9 @@ export const SlashCommandPicker = memo(function SlashCommandPicker({
               <span className={cn('shrink-0', isActive ? 'text-foreground' : 'text-muted-foreground/50')}>
                 <Icon />
               </span>
-              <span className="font-medium text-[13px]">/{cmd.name}</span>
-              {cmd.description && (
-                <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground/60">{cmd.description}</span>
+              <span className="font-medium text-[13px]">/{name}</span>
+              {description && (
+                <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground/60">{description}</span>
               )}
             </li>
           )

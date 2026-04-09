@@ -289,7 +289,7 @@ export function DiffViewer({ diff, taskId, workspace, onRefreshDiff }: DiffViewe
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* File list sidebar */}
-        <div className="w-44 shrink-0 border-r overflow-y-auto">
+        <div className="w-44 shrink-0 border-r overflow-y-auto min-h-0">
           <button
             type="button"
             onClick={clearSelection}

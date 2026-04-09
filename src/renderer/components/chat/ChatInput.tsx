@@ -7,7 +7,9 @@ import { useDebugStore } from '@/stores/debugStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { ipc } from '@/lib/ipc'
 import { SlashCommandPicker } from './SlashCommandPicker'
+import { SlashActionPanel } from './SlashPanels'
 import { BranchSelector } from './BranchSelector'
+import { useSlashAction } from '@/hooks/useSlashAction'
 
 // ── Inline SVG icons for modes ──────────────────────────────────────
 const ChatBubbleIcon = () => (
@@ -266,22 +268,26 @@ const ModeToggle = memo(function ModeToggle() {
 interface ChatInputProps {
   disabled?: boolean
   contextUsage?: { used: number; size: number } | null
+  messageCount?: number
+  isRunning?: boolean
   onSendMessage: (message: string) => void
+  onPause?: () => void
   workspace?: string | null
 }
 
-export const ChatInput = memo(function ChatInput({ disabled, contextUsage, onSendMessage, workspace }: ChatInputProps) {
+export const ChatInput = memo(function ChatInput({ disabled, contextUsage, messageCount = 0, isRunning, onSendMessage, onPause, workspace }: ChatInputProps) {
   const [value, setValue] = useState('')
   const [slashIndex, setSlashIndex] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const commands = useSettingsStore((s) => s.availableCommands)
+  const { panel, dismissPanel, execute } = useSlashAction()
 
   const isSlash = value.startsWith('/')
   const slashQuery = isSlash ? value.slice(1) : ''
   const filteredCmds = isSlash
-    ? (slashQuery ? commands.filter((c) => c.name.toLowerCase().startsWith(slashQuery.toLowerCase())) : commands)
+    ? (slashQuery ? commands.filter((c) => c.name.replace(/^\/+/, '').toLowerCase().startsWith(slashQuery.toLowerCase())) : commands)
     : []
-  const showPicker = isSlash && filteredCmds.length > 0
+  const showPicker = isSlash && filteredCmds.length > 0 && !panel
 
   const resize = useCallback(() => {
     const el = textareaRef.current
@@ -293,20 +299,28 @@ export const ChatInput = memo(function ChatInput({ disabled, contextUsage, onSen
   const handleSend = useCallback(() => {
     const trimmed = value.trim()
     if (!trimmed || disabled) return
+    dismissPanel()
     setValue('')
     setSlashIndex(0)
     onSendMessage(trimmed)
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
     textareaRef.current?.focus()
-  }, [value, disabled, onSendMessage])
+  }, [value, disabled, onSendMessage, dismissPanel])
 
   const handleSelectCommand = useCallback((cmd: { name: string }) => {
+    if (execute(cmd.name)) {
+      setValue('')
+      setSlashIndex(0)
+      textareaRef.current?.focus()
+      return
+    }
     setValue(`/${cmd.name} `)
     setSlashIndex(0)
     textareaRef.current?.focus()
-  }, [])
+  }, [execute])
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (panel && e.key === 'Escape') { e.preventDefault(); dismissPanel(); return }
     if (showPicker) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setSlashIndex((i) => i + 1); return }
       if (e.key === 'ArrowUp') { e.preventDefault(); setSlashIndex((i) => Math.max(0, i - 1)); return }
@@ -322,13 +336,13 @@ export const ChatInput = memo(function ChatInput({ disabled, contextUsage, onSen
       e.preventDefault()
       handleSend()
     }
-  }, [showPicker, filteredCmds, slashIndex, handleSend, handleSelectCommand])
+  }, [panel, dismissPanel, showPicker, filteredCmds, slashIndex, handleSend, handleSelectCommand])
 
   const canSend = !disabled && value.trim().length > 0
 
   return (
-    <div className="px-3 pt-1.5 pb-3 sm:px-5 sm:pt-2 sm:pb-4">
-      <div className="mx-auto w-full min-w-0 max-w-3xl">
+    <div className="px-4 pt-1.5 pb-3 sm:px-6 sm:pt-2 sm:pb-4">
+      <div className="mx-auto w-full min-w-0 max-w-2xl lg:max-w-3xl xl:max-w-4xl">
         <div className={cn(
           'rounded-[20px] border bg-card transition-colors duration-200',
           'focus-within:border-ring/45 border-border',
@@ -344,6 +358,7 @@ export const ChatInput = memo(function ChatInput({ disabled, contextUsage, onSen
                 activeIndex={slashIndex}
               />
             )}
+            {panel && <SlashActionPanel panel={panel} onDismiss={dismissPanel} />}
             <textarea
               ref={textareaRef}
               value={value}
@@ -372,24 +387,40 @@ export const ChatInput = memo(function ChatInput({ disabled, contextUsage, onSen
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
-              {contextUsage && contextUsage.size > 0 && (
+              {contextUsage && contextUsage.size > 0 ? (
                 <ContextRing used={contextUsage.used} size={contextUsage.size} />
+              ) : messageCount > 0 ? (
+                <ContextRing used={Math.min(messageCount * 3, 95)} size={100} />
+              ) : null}
+              {isRunning ? (
+                <button
+                  type="button"
+                  onClick={onPause}
+                  aria-label="Pause agent"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/90 text-primary-foreground transition-all duration-150 hover:bg-primary hover:scale-105"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+                    <rect x="1.5" y="1" width="3" height="10" rx="1" />
+                    <rect x="7.5" y="1" width="3" height="10" rx="1" />
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={!canSend}
+                  aria-label="Send message"
+                  className={cn(
+                    'flex h-8 w-8 items-center justify-center rounded-full transition-all duration-150',
+                    'bg-primary/90 text-primary-foreground hover:bg-primary hover:scale-105',
+                    'disabled:pointer-events-none disabled:opacity-30 disabled:hover:scale-100',
+                  )}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                    <path d="M7 11.5V2.5M7 2.5L3 6.5M7 2.5L11 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
               )}
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={!canSend}
-                aria-label="Send message"
-                className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded-full transition-all duration-150',
-                  'bg-primary/90 text-primary-foreground hover:bg-primary hover:scale-105',
-                  'disabled:pointer-events-none disabled:opacity-30 disabled:hover:scale-100',
-                )}
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                  <path d="M7 11.5V2.5M7 2.5L3 6.5M7 2.5L11 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
             </div>
           </div>
         </div>

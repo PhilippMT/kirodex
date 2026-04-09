@@ -3,18 +3,56 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct Settings {
-    pub kiro_bin: Option<String>,
-    pub auto_approve: bool,
+pub struct AgentProfile {
+    pub id: String,
+    pub name: String,
+    pub agent_id: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub is_default: bool,
 }
 
-impl Default for Settings {
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectPrefs {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auto_approve: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AppSettings {
+    #[serde(default = "default_kiro_bin")]
+    pub kiro_bin: String,
+    #[serde(default)]
+    pub agent_profiles: Vec<AgentProfile>,
+    #[serde(default = "default_font_size")]
+    pub font_size: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_model: Option<String>,
+    #[serde(default)]
+    pub auto_approve: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_prefs: Option<std::collections::HashMap<String, ProjectPrefs>>,
+}
+
+fn default_kiro_bin() -> String { "kiro-cli".to_string() }
+fn default_font_size() -> u32 { 13 }
+
+impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            kiro_bin: None,
+            kiro_bin: default_kiro_bin(),
+            agent_profiles: vec![],
+            font_size: default_font_size(),
+            default_model: None,
             auto_approve: false,
+            project_prefs: None,
         }
     }
 }
@@ -22,7 +60,7 @@ impl Default for Settings {
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct StoreData {
-    pub settings: Settings,
+    pub settings: AppSettings,
 }
 
 pub struct SettingsState(pub Mutex<StoreData>);
@@ -55,7 +93,7 @@ fn persist_store(data: &StoreData) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn get_settings(state: tauri::State<'_, SettingsState>) -> Result<Settings, String> {
+pub fn get_settings(state: tauri::State<'_, SettingsState>) -> Result<AppSettings, String> {
     let store = state.0.lock().map_err(|e| e.to_string())?;
     Ok(store.settings.clone())
 }
@@ -63,7 +101,7 @@ pub fn get_settings(state: tauri::State<'_, SettingsState>) -> Result<Settings, 
 #[tauri::command]
 pub fn save_settings(
     state: tauri::State<'_, SettingsState>,
-    settings: Settings,
+    settings: AppSettings,
 ) -> Result<(), String> {
     let mut store = state.0.lock().map_err(|e| e.to_string())?;
     store.settings = settings;

@@ -55,7 +55,7 @@ export function CodePanel({ onClose }: CodePanelProps) {
 
   return (
     <div
-      className="flex h-full border-l"
+      className="flex h-full min-h-0 min-w-0 border-l"
       style={isExpanded ? { flex: '1 0 100%' } : { width }}
     >
       {/* Resize handle */}
@@ -66,7 +66,7 @@ export function CodePanel({ onClose }: CodePanelProps) {
         />
       )}
 
-      <div className="flex flex-1 flex-col min-w-0">
+      <div className="flex min-h-0 flex-1 flex-col min-w-0 overflow-hidden">
         {/* Header */}
         <div className="flex items-center border-b">
           <div className="flex flex-1 items-center gap-1.5 px-3 py-1.5">

@@ -18,6 +18,23 @@ interface DebugStore {
   setFilter: (filter: Partial<DebugStore['filter']>) => void
 }
 
+// Batch debug entries with rAF to avoid per-entry state updates during streaming
+let entryBuf: DebugLogEntry[] = []
+let entryRaf: number | null = null
+
+const flushEntries = () => {
+  const buf = entryBuf; entryBuf = []; entryRaf = null
+  if (buf.length === 0) return
+  useDebugStore.setState((s) => {
+    const combined = s.entries.concat(buf)
+    return {
+      entries: combined.length > MAX_ENTRIES
+        ? combined.slice(-MAX_ENTRIES)
+        : combined,
+    }
+  })
+}
+
 export const useDebugStore = create<DebugStore>((set) => ({
   entries: [],
   isOpen: false,
@@ -27,12 +44,15 @@ export const useDebugStore = create<DebugStore>((set) => ({
     errorsOnly: false,
   },
 
-  addEntry: (entry) =>
-    set((state) => ({
-      entries: state.entries.length >= MAX_ENTRIES
-        ? [...state.entries.slice(-MAX_ENTRIES + 1), entry]
-        : [...state.entries, entry],
-    })),
+  addEntry: (raw) => {
+    const entry: DebugLogEntry = {
+      ...raw,
+      id: raw.id ?? Date.now() + Math.random(),
+      timestamp: raw.timestamp ?? new Date().toISOString(),
+    }
+    entryBuf.push(entry)
+    if (!entryRaf) entryRaf = requestAnimationFrame(flushEntries)
+  },
 
   clear: () => set({ entries: [] }),
   toggleOpen: () => set((s) => ({ isOpen: !s.isOpen })),

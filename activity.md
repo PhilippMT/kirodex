@@ -1,87 +1,141 @@
 # Activity Log
 
-## 2026-04-09 03:27 GST (Dubai, UTC+4)
 
-### Added README.md with build/run guide
+## 2026-04-09 12:20 GST (Dubai, UTC+4)
 
-- Full setup, dev, and build instructions
-- Project structure documentation
-- Architecture overview (ACP !Send bridge, per-connection threads)
-- Troubleshooting section
-- Test build verified: `cargo tauri build` produced 8.4 MB arm64 release binary
+### Added ghost ChatInput to empty state
 
-## 2026-04-09 03:16 GST (Dubai, UTC+4)
+The empty state now shows a disabled replica of the ChatInput at the bottom (30% opacity, non-interactive). It mirrors the real component's structure: rounded-[20px] card, placeholder text "Ask anything, or press / for commands", pill-shaped skeleton controls in the footer bar, and a dimmed send button. Gives users a preview of the chat interface before creating a thread.
 
-### Full ACP protocol implementation with agent-client-protocol Rust SDK
+**Build:** `tsc --noEmit` ✓ | `vite build` ✓
 
-Replaced stub ACP commands with real implementation using `agent-client-protocol` v0.10.4 crate.
+**Modified:** `src/renderer/App.tsx`
 
-**Architecture:**
-- Each ACP connection runs on a dedicated OS thread with single-threaded tokio runtime + LocalSet (required because SDK futures are !Send)
-- Main thread communicates via mpsc channels (AcpCommand enum: Prompt, Cancel, SetMode, Kill)
-- Permission requests bridge from !Send ACP thread to Tauri async runtime via oneshot channels
+## 2026-04-09 12:10 GST (Dubai, UTC+4)
 
-**KantokuClient (Client trait impl):**
-- `session_notification`: Parses sessionUpdate type and emits matching frontend events (message_chunk, thinking_chunk, tool_call, tool_call_update, plan_update, usage_update)
-- `request_permission`: Auto-approve logic (allow_once > allow_always > first option), falls back to UI prompt via permission_resolvers
-- `ext_notification`: MCP server tracking (_kiro.dev/mcp/server_initialized, _kiro.dev/mcp/oauth_request)
-- `read_text_file` / `write_text_file`: Direct filesystem access
+### Added skeleton empty state with New Thread button
 
-**Tauri commands (12 total):**
-- task_create, task_list, task_send_message, task_pause, task_resume, task_cancel, task_delete
-- task_allow_permission, task_deny_permission (with option resolution matching Electron)
-- set_mode, list_models (temp connection), probe_capabilities
+Replaced the plain "Select a thread" text with a ghost skeleton of a chat conversation (message bubbles at 7% opacity) and a centered "New Thread" button overlay. If the user has projects, clicking it opens a pending chat for the first project; otherwise it opens the New Project sheet.
 
-**Frontend ipc.ts updated:**
-- Added: detectKiroCli, gitListBranches, gitCheckout, gitCreateBranch, gitStage, gitRevert
-- Added: setMode, listModels, probeCapabilities, selectPermissionOption
-- Added: onMcpUpdate, onMcpConnecting event listeners
-- All functions now have full feature parity with Electron version
+**Build:** `tsc --noEmit` ✓ | `vite build` ✓
 
-**Build status:** cargo check ✅ (0 errors, 0 warnings), tsc ✅, vite build ✅
+**Modified:** `src/renderer/App.tsx`
 
-## 2026-04-09 02:56 GST (Dubai, UTC+4)
+## 2026-04-09 12:06 GST (Dubai, UTC+4)
 
-### Tauri v2 migration complete
+### Cancel running tasks on delete
 
-Migrated kantoku-electron to Tauri v2 in an isolated git worktree (`tauri-migration` branch).
+Deleting a thread or removing a project now calls `ipc.cancelTask()` before `ipc.deleteTask()` to stop any running agent. The cancel is fire-and-forget with a `.catch(() => {})` so it's a no-op for already-stopped tasks.
 
-**What was done:**
-1. Created git worktree at `/Users/sabeur/Documents/work/GitHub/personal/kantoku-tauri`
-2. Installed Rust 1.94.1 and tauri-cli 2.10.1
-3. Initialized Tauri v2 project structure (Cargo.toml, tauri.conf.json, capabilities)
-4. Created 6 Rust command modules (settings, fs_ops, git, acp stubs, pty, kiro_config)
-5. Updated package.json: removed Electron/node-pty/tsdown, added @tauri-apps/api and @tauri-apps/cli
-6. Updated vite.config.ts for Tauri (strictPort, envPrefix, clearScreen)
-7. Rewrote ipc.ts: replaced Electron preload bridge with Tauri invoke/listen
-8. Cleaned index.html (removed Electron CSP)
-9. Deleted all Electron files (main.ts, preload.ts, ACPConnection.ts, ACPManager.ts, tsdown.config.ts)
-10. Updated .gitignore for src-tauri/target
+**Build:** `tsc --noEmit` ✓ | `vite build` ✓
 
-**Build status:** cargo check ✅, tsc --noEmit ✅, vite build ✅
+**Modified:** `src/renderer/components/sidebar/TaskSidebar.tsx`, `src/renderer/stores/taskStore.ts`
 
-**Known limitations:**
-- ACP commands are stubs; real kiro-cli subprocess protocol needs Rust implementation
-- PTY uses portable-pty (needs runtime testing)
-- Event emission from Rust backend not yet wired for streaming (message chunks, thinking, tool calls)
+## 2026-04-09 11:58 GST (Dubai, UTC+4)
 
-## 2026-04-08 23:05 (Dubai)
+### Send button becomes Pause when agent is running
 
-### Created all 6 Tauri v2 backend command files
+The send button in ChatInput now swaps to a Pause icon when the task status is `'running'` (agent is streaming/chunking). Clicking it calls `ipc.pauseTask()`. When the agent is idle, the button reverts to the send arrow.
 
-Created the following files in `src-tauri/src/commands/`:
+- Added `isRunning` and `onPause` props to `ChatInput`
+- ChatPanel passes `taskStatus === 'running'` and a `handlePause` callback
+- Pause button uses the same round primary style as the send button
 
-| File | Lines | Description |
-|------|-------|-------------|
-| `settings.rs` | 71 | JsonStore port: `get_settings`, `save_settings` with `Mutex<StoreData>` managed state. Persists to `kantoku-store.json` in app data dir. |
-| `fs_ops.rs` | 49 | `detect_kiro_cli` (multi-path + `which` fallback), `read_text_file`, `pick_folder` (tauri_plugin_dialog), `open_in_editor` |
-| `git.rs` | 89 | Full git IPC port: `git_detect`, `git_list_branches`, `git_checkout`, `git_create_branch`, `git_commit`, `git_push`, `git_stage`, `git_revert`, `task_diff` |
-| `acp.rs` | 145 | Stub ACP commands with in-memory `Mutex<HashMap>` task store: `task_create`, `task_list`, `task_send_message`, `task_pause`, `task_resume`, `task_cancel`, `task_delete`, `task_allow_permission`, `task_deny_permission` |
-| `pty.rs` | 100 | PTY terminal via `portable-pty`: `pty_create` (spawns shell + reader thread emitting `pty-data-{id}` events), `pty_write`, `pty_resize`, `pty_kill` |
-| `kiro_config.rs` | 177 | Kiro config discovery: scans `~/.kiro/` (global) and `project/.kiro/` (local) for agents, skills, steering rules, MCP servers. Parses frontmatter. |
+**Build:** `tsc --noEmit` ✓ | `vite build` ✓
 
-Also fixed:
-- Added `macOSPrivateApi: true` to `tauri.conf.json` to match `macos-private-api` Cargo feature
-- Created placeholder `icons/icon.png` for build to pass
+**Modified:** `src/renderer/components/chat/ChatInput.tsx`, `src/renderer/components/chat/ChatPanel.tsx`
+## 2026-04-09
 
-Build status: `cargo check` passes with zero errors and zero warnings.
+- **11:57 (Dubai)** — Added copyright notice ("© 2026 Kirodex. All rights reserved.") to the end of `README.md`.
+- **11:58 (Dubai)** — Completed full Rust correctness & architecture review of `src-tauri/src/` (~1,600 lines). Found 2 HIGH, 3 MEDIUM, 4 LOW, 1 INFO issues. No unsafe code. Concurrency model is sound.
+
+## 2026-04-09 11:57 (Dubai Time) - Dynamic slash command actions
+
+**Changes:**
+- Created `useSlashAction` hook (`src/renderer/hooks/useSlashAction.ts`) that intercepts slash commands and runs client-side actions:
+  - `/clear` resets chat messages for the current task
+  - `/model` toggles an inline model picker panel
+  - `/agent` toggles an inline MCP servers panel
+  - `/plan` switches to `kiro_planner` mode
+  - `/chat` switches to `kiro_default` mode
+  - All other commands pass through to ACP as messages
+- Built `SlashPanels.tsx` with two inline panels:
+  - `ModelPickerPanel`: clickable model list with active dot indicator, updates model on click
+  - `AgentListPanel`: MCP servers table showing name, status dot (green=running, amber=loading, red=error), and transport type
+- Integrated into `ChatInput.tsx`: command selection calls `execute()` first; if handled client-side, clears input and returns. Panels render above textarea, dismiss on Escape or message send.
+
+**Files created:**
+- `src/renderer/hooks/useSlashAction.ts`
+- `src/renderer/components/chat/SlashPanels.tsx`
+
+**Files modified:**
+- `src/renderer/components/chat/ChatInput.tsx`
+
+**Build:** tsc ✓, vite build ✓ (5.45s)
+
+## 2026-04-09 12:00 (Dubai Time) - Mode switch feedback for /plan and /chat
+
+**Changes:**
+- `/plan` and `/chat` now show an immediate system message confirming the switch ("Switched to Plan mode")
+- IPC errors are caught and surface a warning message ("⚠️ Failed to sync Plan mode with backend")
+- Extracted `switchMode()` and `addSystemMessage()` helpers in `useSlashAction.ts`
+
+**Files modified:**
+- `src/renderer/hooks/useSlashAction.ts`
+
+**Build:** tsc ✓, vite build ✓ (5.18s)
+
+## 2026-04-09 12:05 (Dubai Time) - Fix chat history being wiped by backend task updates
+
+**Root cause:** `upsertTask()` did a full object replacement. The ACP backend sends `task_update` events with `messages: []` (it doesn't track message history — only the client does). Every status change from the backend wiped all locally-accumulated messages.
+
+**Fix:**
+- `upsertTask()` in `taskStore.ts` now preserves existing messages when the incoming task has an empty messages array
+- `/clear` in `useSlashAction.ts` bypasses `upsertTask` and uses `setState` directly to ensure it's the only path that can wipe messages
+
+**Files modified:**
+- `src/renderer/stores/taskStore.ts` — merge logic in `upsertTask`
+- `src/renderer/hooks/useSlashAction.ts` — `/clear` uses direct `setState`
+
+**Build:** tsc ✓, vite build ✓ (4.97s)
+
+## 2026-04-09 12:09 (Dubai Time) - Store performance audit and optimizations
+
+**Scope:** Full review of all 5 Zustand stores (taskStore, debugStore, settingsStore, kiroStore, diffStore)
+
+**Findings:** 9 issues (1 High, 5 Medium, 3 Low). diffStore was clean.
+
+**Fixes applied:**
+
+taskStore.ts (6 fixes):
+- `upsertTask`: bail-out when status, messages, name, pendingPermission, plan, contextUsage are all unchanged
+- `clearTurn`: bail-out when streamingChunks, thinkingChunks, liveToolCalls are already empty
+- `upsertToolCall`: bail-out when tool call status + content unchanged
+- `updatePlan`: reference equality check before spreading
+- `updateUsage`: value equality check (used + size) before spreading
+- `setSelectedTask`, `setView`, `setConnected`, `renameTask`, `renameProject`: no-op guards
+- `onTurnEnd`: rewritten as single `setState` callback to avoid stale reads between multiple `getState()` calls
+- `onTaskError`: rewritten as single `setState` callback
+
+debugStore.ts (1 fix):
+- `addEntry`: batched with rAF like streaming chunks. Entries accumulate in a buffer and flush once per frame via `concat + slice`, avoiding per-entry array copies during streaming
+
+settingsStore.ts (1 fix):
+- `setProjectPref`: merged double `set()` into single call with conditional spread for `currentModelId`
+
+**Files modified:**
+- `src/renderer/stores/taskStore.ts`
+- `src/renderer/stores/debugStore.ts`
+- `src/renderer/stores/settingsStore.ts`
+
+**Build:** tsc ✓, vite build ✓ (5.52s)
+
+## 2026-04-09 12:21 GST (Dubai, UTC+4)
+
+### Show terminal and diff panel on new threads without conversation
+
+The diff panel toggle and terminal toggle were gated behind `{task && ...}`, so they only rendered when a task existed. On a new thread (where `pendingWorkspace` is set but `task` is null), only the "Open in Editor" button showed.
+
+Moved the diff panel and terminal toggles outside the task guard so they render whenever `workspace` is available. Git actions (commit/push) stay gated on `task` since they need `task.id` for backend calls. Pause/resume/cancel also stay task-gated.
+
+**Modified:** `src/renderer/components/AppHeader.tsx`

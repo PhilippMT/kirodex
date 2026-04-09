@@ -12,10 +12,15 @@ interface DiffStore {
   diff: string
   stats: DiffStats
   loading: boolean
+  selectedFiles: Set<string>
   toggleOpen: () => void
   setOpen: (open: boolean) => void
   fetchDiff: (taskId: string) => Promise<void>
   clear: () => void
+  toggleFileSelection: (filePath: string) => void
+  clearSelection: () => void
+  stageSelected: (taskId: string) => Promise<void>
+  revertSelected: (taskId: string) => Promise<void>
 }
 
 function computeStats(diff: string): DiffStats {
@@ -30,11 +35,12 @@ function computeStats(diff: string): DiffStats {
   return { additions, deletions, fileCount }
 }
 
-export const useDiffStore = create<DiffStore>((set) => ({
+export const useDiffStore = create<DiffStore>((set, get) => ({
   isOpen: false,
   diff: '',
   stats: { additions: 0, deletions: 0, fileCount: 0 },
   loading: false,
+  selectedFiles: new Set<string>(),
 
   toggleOpen: () => set((s) => ({ isOpen: !s.isOpen })),
   setOpen: (open) => set({ isOpen: open }),
@@ -49,5 +55,28 @@ export const useDiffStore = create<DiffStore>((set) => ({
     }
   },
 
-  clear: () => set({ diff: '', stats: { additions: 0, deletions: 0, fileCount: 0 } }),
+  clear: () => set({ diff: '', stats: { additions: 0, deletions: 0, fileCount: 0 }, selectedFiles: new Set() }),
+
+  toggleFileSelection: (filePath: string) => set((s) => {
+    const next = new Set(s.selectedFiles)
+    if (next.has(filePath)) next.delete(filePath)
+    else next.add(filePath)
+    return { selectedFiles: next }
+  }),
+
+  clearSelection: () => set({ selectedFiles: new Set() }),
+
+  stageSelected: async (taskId: string) => {
+    const files = Array.from(get().selectedFiles)
+    await Promise.all(files.map((f) => ipc.gitStage(taskId, f)))
+    set({ selectedFiles: new Set() })
+    await get().fetchDiff(taskId)
+  },
+
+  revertSelected: async (taskId: string) => {
+    const files = Array.from(get().selectedFiles)
+    await Promise.all(files.map((f) => ipc.gitRevert(taskId, f)))
+    set({ selectedFiles: new Set() })
+    await get().fetchDiff(taskId)
+  },
 }))

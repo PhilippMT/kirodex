@@ -26,7 +26,7 @@ export function TerminalOutput({ lines, onClear }: TerminalOutputProps) {
           <Trash2 className="h-3 w-3" />
         </Button>
       </div>
-      <div className="flex-1 overflow-auto p-2">
+      <div className="min-h-0 flex-1 overflow-auto p-2">
         {lines.length === 0 ? (
           <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
             No terminal output yet

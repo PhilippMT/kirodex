@@ -340,7 +340,7 @@ export const DebugPanel = memo(function DebugPanel() {
       </div>
 
       {/* Virtualized log */}
-      <div ref={parentRef} className="flex-1 overflow-auto">
+      <div ref={parentRef} className="min-h-0 flex-1 overflow-auto">
         {filtered.length === 0 ? (
           <div className="flex h-full items-center justify-center text-[11px] text-muted-foreground/40">
             {entries.length === 0 ? 'No debug entries yet' : 'No matches'}

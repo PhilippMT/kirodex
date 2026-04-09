@@ -3,6 +3,7 @@ import type { AgentTask, ActivityEntry, ToolCall, PlanStep } from '@/types'
 import { ipc } from '@/lib/ipc'
 import { useDebugStore } from './debugStore'
 import { useSettingsStore } from './settingsStore'
+import { useDiffStore } from './diffStore'
 import { useKiroStore } from './kiroStore'
 
 interface TaskStore {
@@ -21,6 +22,7 @@ interface TaskStore {
   liveToolCalls: Record<string, ToolCall[]>
   activityFeed: ActivityEntry[]
   connected: boolean
+  terminalOpen: boolean
   setSelectedTask: (id: string | null) => void
   setView: (view: 'chat' | 'dashboard' | 'playground') => void
   setNewProjectOpen: (open: boolean) => void
@@ -40,6 +42,7 @@ interface TaskStore {
   renameTask: (taskId: string, name: string) => void
   projectNames: Record<string, string>
   renameProject: (workspace: string, name: string) => void
+  toggleTerminal: () => void
   loadTasks: () => Promise<void>
   setConnected: (v: boolean) => void
 }
@@ -58,21 +61,28 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   liveToolCalls: {},
   activityFeed: [],
   connected: false,
+  terminalOpen: false,
 
-  setSelectedTask: (id) => set({ selectedTaskId: id }),
-  setView: (view) => set({ view }),
+  setSelectedTask: (id) => {
+    if (get().selectedTaskId === id) return
+    set({ selectedTaskId: id })
+  },
+  setView: (view) => {
+    if (get().view === view) return
+    set({ view })
+  },
   setNewProjectOpen: (open) => set({ isNewProjectOpen: open }),
   setSettingsOpen: (open) => set({ isSettingsOpen: open }),
-  addProject: (workspace) => set((s) => ({
-    projects: s.projects.includes(workspace) ? s.projects : [...s.projects, workspace],
-  })),
+  addProject: (workspace) => {
+    if (get().projects.includes(workspace)) return
+    set((s) => ({ projects: [...s.projects, workspace] }))
+  },
 
   removeProject: (workspace) => set((s) => {
-    // Remove project and all its tasks
     const taskIds = Object.keys(s.tasks).filter((id) => s.tasks[id].workspace === workspace)
     const tasks = { ...s.tasks }
     taskIds.forEach((id) => { delete tasks[id] })
-    // Also cancel via IPC (fire and forget)
+    taskIds.forEach((id) => { void ipc.cancelTask(id).catch(() => {}) })
     taskIds.forEach((id) => { void ipc.deleteTask(id) })
     const selectedTaskId = taskIds.includes(s.selectedTaskId ?? '') ? null : s.selectedTaskId
     return {
@@ -86,6 +96,22 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   upsertTask: (task) =>
     set((state) => {
       const prev = state.tasks[task.id]
+      // Preserve locally-accumulated messages when the backend sends an empty array
+      const messages = task.messages.length > 0
+        ? task.messages
+        : (prev?.messages ?? [])
+      // Bail out if nothing meaningful changed
+      if (prev
+        && prev.status === task.status
+        && prev.messages === messages
+        && prev.name === task.name
+        && prev.pendingPermission === task.pendingPermission
+        && prev.plan === task.plan
+        && prev.contextUsage === task.contextUsage
+      ) {
+        return state
+      }
+      const merged = { ...task, messages }
       const activity: ActivityEntry[] =
         !prev || prev.status !== task.status
           ? [
@@ -99,13 +125,14 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
             ].slice(0, 20)
           : state.activityFeed
       return {
-        tasks: { ...state.tasks, [task.id]: task },
+        tasks: { ...state.tasks, [task.id]: merged },
         activityFeed: activity,
       }
     }),
 
   removeTask: (id) =>
     set((state) => {
+      if (!state.tasks[id]) return state
       const { [id]: _, ...rest } = state.tasks
       const { [id]: _c, ...chunks } = state.streamingChunks
       const { [id]: _t, ...thinking } = state.thinkingChunks
@@ -139,6 +166,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     set((state) => {
       const existing = state.liveToolCalls[taskId] ?? []
       const idx = existing.findIndex((tc) => tc.toolCallId === toolCall.toolCallId)
+      if (idx >= 0 && existing[idx].status === toolCall.status && existing[idx].content === toolCall.content) {
+        return state
+      }
       const updated = idx >= 0
         ? existing.map((tc, i) => (i === idx ? toolCall : tc))
         : [...existing, toolCall]
@@ -150,7 +180,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   updatePlan: (taskId, plan) =>
     set((state) => {
       const task = state.tasks[taskId]
-      if (!task) return state
+      if (!task || task.plan === plan) return state
       return {
         tasks: { ...state.tasks, [taskId]: { ...task, plan } },
       }
@@ -160,20 +190,26 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     set((state) => {
       const task = state.tasks[taskId]
       if (!task) return state
+      const cu = task.contextUsage
+      if (cu && cu.used === used && cu.size === size) return state
       return {
         tasks: { ...state.tasks, [taskId]: { ...task, contextUsage: { used, size } } },
       }
     }),
 
-  /** Clear live turn state when turn ends */
   clearTurn: (taskId) =>
-    set((state) => ({
-      streamingChunks: { ...state.streamingChunks, [taskId]: '' },
-      thinkingChunks: { ...state.thinkingChunks, [taskId]: '' },
-      liveToolCalls: { ...state.liveToolCalls, [taskId]: [] },
-    })),
+    set((state) => {
+      const hasChunks = !!state.streamingChunks[taskId]
+      const hasThinking = !!state.thinkingChunks[taskId]
+      const hasTools = state.liveToolCalls[taskId]?.length > 0
+      if (!hasChunks && !hasThinking && !hasTools) return state
+      return {
+        streamingChunks: { ...state.streamingChunks, [taskId]: '' },
+        thinkingChunks: { ...state.thinkingChunks, [taskId]: '' },
+        liveToolCalls: { ...state.liveToolCalls, [taskId]: [] },
+      }
+    }),
 
-  /** Create a local draft thread in a single atomic state update */
   createDraftThread: (workspace) => {
     const id = crypto.randomUUID()
     const name = `Thread ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
@@ -206,14 +242,17 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   renameTask: (taskId, name) =>
     set((state) => {
       const task = state.tasks[taskId]
-      if (!task) return state
+      if (!task || task.name === name) return state
       return { tasks: { ...state.tasks, [taskId]: { ...task, name } } }
     }),
 
   renameProject: (workspace, name) =>
-    set((state) => ({
-      projectNames: { ...state.projectNames, [workspace]: name },
-    })),
+    set((state) => {
+      if (state.projectNames[workspace] === name) return state
+      return { projectNames: { ...state.projectNames, [workspace]: name } }
+    }),
+
+  toggleTerminal: () => set((s) => ({ terminalOpen: !s.terminalOpen })),
 
   loadTasks: async () => {
     try {
@@ -226,7 +265,10 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     }
   },
 
-  setConnected: (v) => set({ connected: v }),
+  setConnected: (v) => {
+    if (get().connected === v) return
+    set({ connected: v })
+  },
 }))
 
 export function initTaskListeners(): () => void {
@@ -273,6 +315,12 @@ export function initTaskListeners(): () => void {
 
   const unsub5 = ipc.onToolCallUpdate(({ taskId, toolCall }) => {
     useTaskStore.getState().upsertToolCall(taskId, toolCall)
+    if (
+      toolCall.status === 'completed' &&
+      (toolCall.kind === 'edit' || toolCall.kind === 'delete' || toolCall.kind === 'move')
+    ) {
+      useDiffStore.getState().fetchDiff(taskId)
+    }
   })
 
   const unsub6 = ipc.onPlanUpdate(({ taskId, plan }) => {
@@ -284,7 +332,38 @@ export function initTaskListeners(): () => void {
   })
 
   const unsub8 = ipc.onTurnEnd(({ taskId }) => {
-    useTaskStore.getState().clearTurn(taskId)
+    // Use a single setState to avoid stale reads between getState() calls
+    useTaskStore.setState((s) => {
+      const chunk = s.streamingChunks[taskId] ?? ''
+      const thinking = s.thinkingChunks[taskId] ?? ''
+      const liveTools = s.liveToolCalls[taskId] ?? []
+      const task = s.tasks[taskId]
+      if (!task) return s
+      let updatedTask: AgentTask
+      if (chunk || liveTools.length > 0) {
+        const assistantMsg: import('@/types').TaskMessage = {
+          role: 'assistant' as const,
+          content: chunk,
+          timestamp: new Date().toISOString(),
+          ...(thinking ? { thinking } : {}),
+          ...(liveTools.length > 0 ? { toolCalls: liveTools } : {}),
+        }
+        updatedTask = {
+          ...task,
+          status: 'paused',
+          messages: [...task.messages, assistantMsg],
+          pendingPermission: undefined,
+        }
+      } else {
+        updatedTask = { ...task, status: 'paused' }
+      }
+      return {
+        tasks: { ...s.tasks, [taskId]: updatedTask },
+        streamingChunks: { ...s.streamingChunks, [taskId]: '' },
+        thinkingChunks: { ...s.thinkingChunks, [taskId]: '' },
+        liveToolCalls: { ...s.liveToolCalls, [taskId]: [] },
+      }
+    })
   })
 
   const unsub9 = ipc.onDebugLog((entry) => {
@@ -292,7 +371,6 @@ export function initTaskListeners(): () => void {
     if (entry.category === 'stderr') {
       const text = typeof entry.payload === 'string' ? entry.payload : JSON.stringify(entry.payload)
       if (text.includes('Dynamic registration failed') || text.includes('invalid_redirect_uri')) {
-        // Use the server name tracked from the preceding server_initialized notification
         const knownServers = ['slack', 'figma', 'github', 'notion', 'linear', 'jira', 'atlassian']
         const serverName = entry.mcpServerName
           ?? knownServers.find((s) => text.toLowerCase().includes(s))
@@ -302,21 +380,22 @@ export function initTaskListeners(): () => void {
     }
   })
 
-  const unsub10 = ipc.onSessionInit(({ models, modes }) => {
-    // Update settings store with models from the live ACP session
+  const unsub10 = ipc.onSessionInit(({ taskId, models, modes }) => {
+    console.log('[session_init] received', { taskId, models, modes })
     if (models && typeof models === 'object') {
       const m = models as { availableModels?: Array<{ modelId: string; name: string; description?: string | null }>; currentModelId?: string }
       if (m.availableModels) {
+        console.log('[session_init] setting models:', m.availableModels.length, 'current:', m.currentModelId)
         useSettingsStore.setState({
           availableModels: m.availableModels,
           currentModelId: m.currentModelId ?? null,
         })
       }
     }
-    // Update settings store with modes from the live ACP session
     if (modes && typeof modes === 'object') {
       const md = modes as { availableModes?: Array<{ id: string; name: string; description?: string | null }>; currentModeId?: string }
       if (md.availableModes) {
+        console.log('[session_init] setting modes:', md.availableModes.length, 'current:', md.currentModeId)
         useSettingsStore.setState({
           availableModes: md.availableModes,
           currentModeId: md.currentModeId ?? null,
@@ -330,16 +409,21 @@ export function initTaskListeners(): () => void {
   })
 
   const unsub12 = ipc.onTaskError(({ taskId, message }) => {
-    const state = useTaskStore.getState()
-    const task = state.tasks[taskId]
-    if (!task) return
-    const errorMsg: import('@/types').TaskMessage = {
-      role: 'system' as const,
-      content: `\u26a0\ufe0f ${message}`,
-      timestamp: new Date().toISOString(),
-    }
-    state.upsertTask({ ...task, messages: [...task.messages, errorMsg], status: 'error' })
-    state.clearTurn(taskId)
+    useTaskStore.setState((s) => {
+      const task = s.tasks[taskId]
+      if (!task) return s
+      const errorMsg: import('@/types').TaskMessage = {
+        role: 'system' as const,
+        content: `\u26a0\ufe0f ${message}`,
+        timestamp: new Date().toISOString(),
+      }
+      return {
+        tasks: { ...s.tasks, [taskId]: { ...task, messages: [...task.messages, errorMsg], status: 'error' } },
+        streamingChunks: { ...s.streamingChunks, [taskId]: '' },
+        thinkingChunks: { ...s.thinkingChunks, [taskId]: '' },
+        liveToolCalls: { ...s.liveToolCalls, [taskId]: [] },
+      }
+    })
   })
 
   return () => {

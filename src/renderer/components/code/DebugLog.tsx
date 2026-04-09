@@ -41,7 +41,7 @@ export function DebugLog({ entries, onClear }: DebugLogProps) {
           <Trash2 className="h-3 w-3" />
         </Button>
       </div>
-      <div className="flex-1 overflow-auto p-2 space-y-1">
+      <div className="min-h-0 flex-1 overflow-auto p-2 space-y-1">
         {filtered.length === 0 ? (
           <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
             No debug messages

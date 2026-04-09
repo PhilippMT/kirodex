@@ -51,20 +51,14 @@ export const BranchSelector = memo(function BranchSelector({ workspace }: Branch
     }
   }, [workspace])
 
-  // Fetch current branch on mount so trigger shows it immediately
-  useEffect(() => {
-    fetchBranches()
-  }, [fetchBranches])
+  // Fetch current branch on mount
+  useEffect(() => { fetchBranches() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // On open, refresh and focus search
   useEffect(() => {
-    if (open) {
-      fetchBranches()
-      // Small delay so the popup renders first
-      requestAnimationFrame(() => inputRef.current?.focus())
-    } else {
-      setSearch('')
-    }
+    if (!open) { setSearch(''); return }
+    fetchBranches()
+    requestAnimationFrame(() => inputRef.current?.focus())
   }, [open, fetchBranches])
 
   // Click outside → close
@@ -168,7 +162,7 @@ export const BranchSelector = memo(function BranchSelector({ workspace }: Branch
   if (!workspace) return null
 
   return (
-    <div ref={containerRef} className="relative mx-auto w-full max-w-3xl px-5">
+    <div ref={containerRef} className="relative mx-auto w-full max-w-2xl px-6 lg:max-w-3xl xl:max-w-4xl">
       {/* Trigger */}
       <button
         type="button"

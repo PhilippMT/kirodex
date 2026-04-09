@@ -1,7 +1,11 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { App } from './App'
+import '@fontsource-variable/dm-sans'
 import '../tailwind.css'
+
+// Apply dark theme immediately to prevent white flash
+document.documentElement.classList.add('dark')
 
 function showError(err: unknown) {
   const fallback = document.getElementById('error-fallback')
@@ -29,6 +33,11 @@ class ErrorBoundary extends React.Component<
 window.addEventListener('unhandledrejection', (e) => showError(e.reason))
 window.addEventListener('error', (e) => showError(e.error ?? e.message))
 
+// Wire up error fallback reload button
+document.getElementById('reload-btn')?.addEventListener('click', () => {
+  window.location.reload()
+})
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
@@ -36,3 +45,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </ErrorBoundary>
   </React.StrictMode>,
 )
+
+// Fade out and remove splash screen after React mounts
+const splash = document.getElementById('splash')
+if (splash) {
+  splash.style.opacity = '0'
+  splash.addEventListener('transitionend', () => splash.remove(), { once: true })
+}

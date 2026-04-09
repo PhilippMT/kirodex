@@ -6,7 +6,7 @@ import path from "node:path";
 export default defineConfig({
   plugins: [tailwindcss(), react()],
   root: ".",
-  base: "./",
+  base: "/",
   clearScreen: false,
   envPrefix: ["VITE_", "TAURI_"],
   resolve: {
@@ -21,5 +21,8 @@ export default defineConfig({
   server: {
     port: 5174,
     strictPort: true,
+    watch: {
+      ignored: ['**/README.md', '**/activity.md', '**/src-tauri/**', '**/target/**'],
+    },
   },
 });

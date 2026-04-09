@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { memo, useEffect, useRef, useCallback, useState } from 'react'
 import { SquareSplitHorizontal, Plus, Trash2 } from 'lucide-react'
 import { Terminal } from 'xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -20,7 +20,7 @@ interface TermInstance {
 let termCounter = 0
 function nextId() { return `pty-${++termCounter}` }
 
-export function TerminalDrawer({ cwd }: TerminalDrawerProps) {
+export const TerminalDrawer = memo(function TerminalDrawer({ cwd }: TerminalDrawerProps) {
   const [instances, setInstances] = useState<TermInstance[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [height, setHeight] = useState(280)
@@ -28,6 +28,12 @@ export function TerminalDrawer({ cwd }: TerminalDrawerProps) {
   const dragStartY = useRef<number | null>(null)
   const dragStartH = useRef(280)
   const readyPtys = useRef<Set<string>>(new Set())
+  const instancesRef = useRef<TermInstance[]>([])
+  const heightRef = useRef(280)
+
+  // Keep refs in sync
+  instancesRef.current = instances
+  heightRef.current = height
 
   const createTerminal = useCallback(async () => {
     const id = nextId()
@@ -100,29 +106,29 @@ export function TerminalDrawer({ cwd }: TerminalDrawerProps) {
     return instance
   }, [cwd])
 
+  // Create initial terminal on mount, cleanup all on unmount
   useEffect(() => {
     void createTerminal()
     return () => {
-      setInstances((prev) => {
-        prev.forEach((inst) => { void ipc.ptyKill(inst.id); inst.term.dispose() })
-        readyPtys.current.clear()
-        return []
-      })
+      instancesRef.current.forEach((inst) => { void ipc.ptyKill(inst.id); inst.term.dispose() })
+      readyPtys.current.clear()
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Subscribe to PTY data/exit once — use ref to find instances without re-subscribing
   useEffect(() => {
     const unsub = ipc.onPtyData(({ id, data }) => {
-      const inst = instances.find((i) => i.id === id)
+      const inst = instancesRef.current.find((i) => i.id === id)
       inst?.term.write(data)
     })
     const unsubExit = ipc.onPtyExit(({ id }) => {
-      const inst = instances.find((i) => i.id === id)
+      const inst = instancesRef.current.find((i) => i.id === id)
       inst?.term.write('\r\n[Process exited]\r\n')
     })
     return () => { unsub(); unsubExit() }
-  }, [instances])
+  }, [])
 
+  // Open terminal into DOM when instances change
   useEffect(() => {
     instances.forEach((inst) => {
       if (inst.containerRef.current && !inst.term.element) {
@@ -136,6 +142,7 @@ export function TerminalDrawer({ cwd }: TerminalDrawerProps) {
     })
   }, [instances])
 
+  // ResizeObserver for active terminal
   useEffect(() => {
     const active = instances.find((i) => i.id === activeId)
     if (!active?.containerRef.current) return
@@ -148,9 +155,10 @@ export function TerminalDrawer({ cwd }: TerminalDrawerProps) {
     return () => ro.disconnect()
   }, [activeId, instances])
 
+  // Use ref for height to avoid re-creating drag handler on every height change
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     dragStartY.current = e.clientY
-    dragStartH.current = height
+    dragStartH.current = heightRef.current
     const onMove = (ev: MouseEvent) => {
       if (dragStartY.current === null) return
       const delta = dragStartY.current - ev.clientY
@@ -163,17 +171,17 @@ export function TerminalDrawer({ cwd }: TerminalDrawerProps) {
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
-  }, [height])
+  }, [])
 
   const handleClose = useCallback((id: string) => {
-    const inst = instances.find((i) => i.id === id)
+    const inst = instancesRef.current.find((i) => i.id === id)
     if (inst) { void ipc.ptyKill(id); inst.term.dispose(); readyPtys.current.delete(id) }
     setInstances((prev) => {
       const next = prev.filter((i) => i.id !== id)
-      if (activeId === id) setActiveId(next[next.length - 1]?.id ?? null)
+      setActiveId((cur) => cur === id ? (next[next.length - 1]?.id ?? null) : cur)
       return next
     })
-  }, [instances, activeId])
+  }, [])
 
   const handleSplit = useCallback(() => { void createTerminal() }, [createTerminal])
 
@@ -256,4 +264,4 @@ export function TerminalDrawer({ cwd }: TerminalDrawerProps) {
       </div>
     </aside>
   )
-}
+})

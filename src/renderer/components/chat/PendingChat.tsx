@@ -25,7 +25,7 @@ export function PendingChat({ workspace }: PendingChatProps) {
   }, [workspace, upsertTask, setSelectedTask, setPendingWorkspace])
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-1 items-center justify-center">
         <p className="text-sm text-muted-foreground/40 select-none">New thread</p>
       </div>

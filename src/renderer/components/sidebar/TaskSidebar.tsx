@@ -41,7 +41,7 @@ const KiroConfigFooter = memo(function KiroConfigFooter() {
   }, [height])
 
   return (
-    <div className="flex flex-col shrink-0 border-b border-border">
+    <div className="flex min-h-0 flex-col border-b border-border">
       {/* Drag handle */}
       <div className="flex items-center border-t border-border">
         <div
@@ -55,7 +55,7 @@ const KiroConfigFooter = memo(function KiroConfigFooter() {
           <KiroConfigPanel collapsed={collapsed} onToggleCollapse={toggleCollapse} />
         </div>
       ) : (
-        <ScrollArea style={{ height }}>
+        <ScrollArea style={{ height, maxHeight: '100%' }} className="min-h-0">
           <div className="px-1 py-1">
             <KiroConfigPanel collapsed={collapsed} onToggleCollapse={toggleCollapse} />
           </div>
@@ -364,7 +364,7 @@ export const TaskSidebar = memo(function TaskSidebar() {
   )
 
   const handleDeleteTask = useCallback(
-    (id: string) => { removeTask(id); void ipc.deleteTask(id) },
+    (id: string) => { void ipc.cancelTask(id).catch(() => {}); removeTask(id); void ipc.deleteTask(id) },
     [removeTask],
   )
 
@@ -377,8 +377,8 @@ export const TaskSidebar = memo(function TaskSidebar() {
   const openSettings = useCallback(() => setSettingsOpen(true), [setSettingsOpen])
 
   return (
-    <div className="flex h-full w-60 shrink-0 flex-col border-r bg-card text-foreground">
-      <ScrollArea className="flex-1">
+    <div className="flex h-full min-h-0 w-60 shrink-0 flex-col border-r bg-card text-foreground">
+      <ScrollArea className="min-h-0 flex-1">
         <div className="p-2">
           {/* Projects section */}
           <div className="relative flex w-full min-w-0 flex-col">
@@ -435,7 +435,7 @@ export const TaskSidebar = memo(function TaskSidebar() {
       {/* Kiro Config (agents, skills, steering, MCP) — collapsible, resizable */}
       <KiroConfigFooter />
 
-      <div className="flex flex-col gap-2 p-2">
+      <div className="flex shrink-0 flex-col gap-2 p-2">
         <ul className="flex w-full min-w-0 flex-col gap-1">
           <li>
             <button

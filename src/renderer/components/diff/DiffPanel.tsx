@@ -1,10 +1,11 @@
 import { memo, useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { parsePatchFiles, type FileDiffMetadata } from '@pierre/diffs'
 import { FileDiff, Virtualizer } from '@pierre/diffs/react'
-import { X, GripHorizontal, Columns2, Rows2, WrapText, FileCode, RefreshCw } from 'lucide-react'
+import { X, GripHorizontal, Columns2, Rows2, WrapText, FileCode, RefreshCw, Plus, Undo2 } from 'lucide-react'
 import { useDiffStore } from '@/stores/diffStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 
 // ── Theme CSS overrides ──────────────────────────────────────────
@@ -56,6 +57,10 @@ export const DiffPanel = memo(function DiffPanel() {
   const loading = useDiffStore((s) => s.loading)
   const fetchDiff = useDiffStore((s) => s.fetchDiff)
   const setOpen = useDiffStore((s) => s.setOpen)
+  const selectedFiles = useDiffStore((s) => s.selectedFiles)
+  const toggleFileSelection = useDiffStore((s) => s.toggleFileSelection)
+  const stageSelected = useDiffStore((s) => s.stageSelected)
+  const revertSelected = useDiffStore((s) => s.revertSelected)
 
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId)
   const taskWorkspace = useTaskStore((s) => selectedTaskId ? s.tasks[selectedTaskId]?.workspace : undefined)
@@ -95,9 +100,19 @@ export const DiffPanel = memo(function DiffPanel() {
 
   const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
 
+  const hasSelection = selectedFiles.size > 0
+
   const handleRefresh = useCallback(() => {
     if (selectedTaskId) void fetchDiff(selectedTaskId)
   }, [selectedTaskId, fetchDiff])
+
+  const handleStageSelected = useCallback(() => {
+    if (selectedTaskId) void stageSelected(selectedTaskId)
+  }, [selectedTaskId, stageSelected])
+
+  const handleRevertSelected = useCallback(() => {
+    if (selectedTaskId) void revertSelected(selectedTaskId)
+  }, [selectedTaskId, revertSelected])
 
   // Resize drag
   const onDragStart = useCallback((e: React.MouseEvent) => {
@@ -227,7 +242,7 @@ export const DiffPanel = memo(function DiffPanel() {
       {/* Content */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* File sidebar */}
-        <div className="w-48 shrink-0 border-r overflow-y-auto">
+        <div className="w-48 shrink-0 border-r overflow-y-auto min-h-0 flex flex-col">
           <button
             type="button"
             onClick={() => setSelectedFileIdx(null)}
@@ -238,24 +253,75 @@ export const DiffPanel = memo(function DiffPanel() {
           >
             All files ({parsedFiles.length})
           </button>
-          {fileStats.map((file, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setSelectedFileIdx(i)}
-              className={cn(
-                'flex items-center gap-1 w-full px-2 py-1 text-[10px] hover:bg-accent/10 truncate transition-colors',
-                selectedFileIdx === i && 'bg-accent/30 text-foreground',
-              )}
-            >
-              <FileCode className="size-3 shrink-0 text-muted-foreground/50" />
-              <span className="min-w-0 flex-1 truncate">{file.name.split('/').pop()}</span>
-              <span className="shrink-0 flex gap-1">
-                {file.additions > 0 && <span className="text-emerald-400">+{file.additions}</span>}
-                {file.deletions > 0 && <span className="text-red-400">-{file.deletions}</span>}
-              </span>
-            </button>
-          ))}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {fileStats.map((file, i) => {
+              const isChecked = selectedFiles.has(file.name)
+              return (
+                <div
+                  key={file.name}
+                  className={cn(
+                    'group flex items-center gap-1 w-full px-1 py-1 text-[10px] hover:bg-accent/10 transition-colors',
+                    selectedFileIdx === i && 'bg-accent/30 text-foreground',
+                  )}
+                >
+                  <Checkbox
+                    checked={isChecked}
+                    onCheckedChange={() => toggleFileSelection(file.name)}
+                    className={cn(
+                      'size-3 shrink-0 transition-opacity',
+                      isChecked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+                    )}
+                    aria-label={`Select ${file.name}`}
+                    tabIndex={0}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFileIdx(i)}
+                    className="flex items-center gap-1 min-w-0 flex-1 truncate"
+                  >
+                    <FileCode className="size-3 shrink-0 text-muted-foreground/50" />
+                    <span className="min-w-0 flex-1 truncate text-left">{file.name.split('/').pop()}</span>
+                    <span className="shrink-0 flex gap-1">
+                      {file.additions > 0 && <span className="text-emerald-400">+{file.additions}</span>}
+                      {file.deletions > 0 && <span className="text-red-400">-{file.deletions}</span>}
+                    </span>
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+          {hasSelection && (
+            <div className="flex items-center gap-1 border-t px-2 py-1.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleStageSelected}
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-400 hover:bg-emerald-400/10 transition-colors"
+                    aria-label="Stage selected files"
+                  >
+                    <Plus className="size-3" />
+                    Stage ({selectedFiles.size})
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Stage selected files</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleRevertSelected}
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-red-400 hover:bg-red-400/10 transition-colors"
+                    aria-label="Revert selected files"
+                  >
+                    <Undo2 className="size-3" />
+                    Revert
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Revert selected files</TooltipContent>
+              </Tooltip>
+            </div>
+          )}
         </div>
 
         {/* Diff viewer */}

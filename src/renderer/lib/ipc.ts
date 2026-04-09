@@ -5,9 +5,27 @@ import type { AgentTask, AppSettings, KiroConfig, ToolCall, PlanStep, DebugLogEn
 type UnsubscribeFn = () => void
 
 const tauriListen = <T>(event: string, cb: (payload: T) => void): UnsubscribeFn => {
-  let unlisten: UnsubscribeFn = () => {}
-  listen<T>(event, (e) => cb(e.payload)).then((fn) => { unlisten = fn })
-  return () => unlisten()
+  let unlisten: (() => void) | null = null
+  let cleaned = false
+  const ready = listen<T>(event, (e) => { if (!cleaned) cb(e.payload) })
+  ready.then((fn) => {
+    if (cleaned) {
+      try { fn() } catch { /* already unregistered */ }
+    } else {
+      unlisten = fn
+    }
+  }).catch((err) => {
+    console.warn(`[tauriListen] failed to register "${event}":`, err)
+  })
+  return () => {
+    if (cleaned) return
+    cleaned = true
+    if (unlisten) {
+      try { unlisten() } catch { /* already unregistered */ }
+    } else {
+      ready.then((fn) => { try { fn() } catch { /* noop */ } }).catch(() => {})
+    }
+  }
 }
 
 export const ipc = {

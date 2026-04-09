@@ -68,8 +68,8 @@ export const Dashboard = memo(function Dashboard() {
   }, [addProject, createDraftThread])
 
   return (
-    <div className="flex flex-1 overflow-hidden">
-      <ScrollArea className="flex-1">
+    <div className="flex min-h-0 flex-1 overflow-hidden">
+      <ScrollArea className="min-h-0 flex-1">
         <div className="p-6">
           <div className="mb-5 flex items-center gap-3">
             <h1 className="text-lg font-semibold">Dashboard</h1>
@@ -120,7 +120,7 @@ export const Dashboard = memo(function Dashboard() {
                 Activity
               </h2>
             </div>
-            <ScrollArea className="flex-1">
+            <ScrollArea className="min-h-0 flex-1">
               <div className="space-y-1.5 px-4 pb-4">
                 {activityFeed.map((entry) => (
                   <div

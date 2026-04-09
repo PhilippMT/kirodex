@@ -114,6 +114,8 @@ pub struct AcpState {
     pub tasks: Mutex<HashMap<String, Task>>,
     pub connections: Mutex<HashMap<String, ConnectionHandle>>,
     pub permission_resolvers: Mutex<HashMap<String, oneshot::Sender<PermissionReply>>>,
+    /// Guard to prevent concurrent probe_capabilities calls
+    pub probe_running: std::sync::atomic::AtomicBool,
 }
 
 pub struct PermissionReply {
@@ -126,6 +128,7 @@ impl Default for AcpState {
             tasks: Mutex::new(HashMap::new()),
             connections: Mutex::new(HashMap::new()),
             permission_resolvers: Mutex::new(HashMap::new()),
+            probe_running: std::sync::atomic::AtomicBool::new(false),
         }
     }
 }
@@ -264,26 +267,41 @@ impl acp::Client for KirodexClient {
     }
 
     async fn ext_notification(&self, args: acp::ExtNotification) -> acp::Result<()> {
-        let val = serde_json::to_value(&args).unwrap_or_default();
-        let method = val.get("method").and_then(|v| v.as_str()).unwrap_or("");
-        let params = val.get("params").cloned().unwrap_or(Value::Null);
+        let method = args.method.as_ref();
+        let params = serde_json::to_value(&args).unwrap_or_default();
 
         use tauri::Emitter;
-        // MCP server tracking (matches Electron)
-        if method == "_kiro.dev/mcp/server_initialized" {
+
+        // Normalize method: strip leading underscore if present (ACP SDK may vary)
+        let method_normalized = method.strip_prefix('_').unwrap_or(method);
+
+        // MCP server tracking
+        if method_normalized == "kiro.dev/mcp/server_initialized" {
             if let Some(name) = params.get("serverName").and_then(|v| v.as_str()) {
                 let _ = self.app.emit("mcp_update", serde_json::json!({
                     "serverName": name, "status": "ready"
                 }));
             }
         }
-        if method == "_kiro.dev/mcp/oauth_request" {
+        if method_normalized == "kiro.dev/mcp/oauth_request" {
             if let Some(name) = params.get("serverName").and_then(|v| v.as_str()) {
                 let _ = self.app.emit("mcp_update", serde_json::json!({
                     "serverName": name, "status": "needs-auth",
                     "oauthUrl": params.get("oauthUrl")
                 }));
             }
+        }
+        // Commands / MCP servers available
+        if method_normalized == "kiro.dev/commands/available" {
+            let _ = self.app.emit("commands_update", serde_json::json!({
+                "taskId": self.task_id,
+                "commands": params.get("commands").cloned().unwrap_or(Value::Array(vec![]))
+            }));
+        }
+
+        // Skip noisy empty notifications from debug log
+        if method.is_empty() && params.is_null() {
+            return Ok(());
         }
 
         let _ = self.app.emit("debug_log", serde_json::json!({
@@ -325,12 +343,10 @@ fn spawn_connection(
     kiro_bin: String,
     auto_approve: bool,
     app: tauri::AppHandle,
-    acp_state: Arc<AcpState>,
 ) -> Result<ConnectionHandle, String> {
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<AcpCommand>();
     let alive = Arc::new(std::sync::atomic::AtomicBool::new(true));
     let alive_clone = alive.clone();
-    let _task_id_clone = task_id.clone();
 
     let (perm_tx, mut perm_rx) = mpsc::unbounded_channel::<(
         String,
@@ -338,9 +354,9 @@ fn spawn_connection(
         oneshot::Sender<PermissionReply>,
     )>();
 
-    // Spawn permission handler on the Tauri async runtime
+    // Spawn permission handler on the Tauri async runtime.
+    // Uses the managed AcpState via app handle — NOT a cloned copy.
     let app2 = app.clone();
-    let state2 = acp_state.clone();
     let tid2 = task_id.clone();
     tauri::async_runtime::spawn(async move {
         while let Some((request_id, req, reply_tx)) = perm_rx.recv().await {
@@ -367,24 +383,29 @@ fn spawn_connection(
                 "Permission requested".to_string()
             };
 
-            // Update task status
-            {
-                let mut tasks = state2.tasks.lock().unwrap();
-                if let Some(task) = tasks.get_mut(&tid2) {
-                    task.status = "pending_permission".to_string();
-                    task.pending_permission = Some(PendingPermission {
-                        request_id: request_id.clone(),
-                        tool_name,
-                        description,
-                        options,
-                    });
-                    use tauri::Emitter;
-                    let _ = app2.emit("task_update", task.clone());
+            // Access the MANAGED state — same instance that tauri commands use.
+            use tauri::Manager;
+            if let Some(managed_state) = app2.try_state::<AcpState>() {
+                // Update task status
+                if let Ok(mut tasks) = managed_state.tasks.lock() {
+                    if let Some(task) = tasks.get_mut(&tid2) {
+                        task.status = "pending_permission".to_string();
+                        task.pending_permission = Some(PendingPermission {
+                            request_id: request_id.clone(),
+                            tool_name,
+                            description,
+                            options,
+                        });
+                        use tauri::Emitter;
+                        let _ = app2.emit("task_update", task.clone());
+                    }
+                }
+
+                // Store the reply sender in the MANAGED state
+                if let Ok(mut resolvers) = managed_state.permission_resolvers.lock() {
+                    resolvers.insert(request_id, reply_tx);
                 }
             }
-
-            // Store the reply sender
-            state2.permission_resolvers.lock().unwrap().insert(request_id, reply_tx);
         }
     });
 
@@ -503,6 +524,22 @@ async fn run_acp_connection(
     // Emit session-init with models/modes/configOptions
     {
         let session_val = serde_json::to_value(&session).unwrap_or_default();
+        let model_count = session_val.get("models")
+            .and_then(|m| m.get("availableModels"))
+            .and_then(|a| a.as_array())
+            .map(|a| a.len())
+            .unwrap_or(0);
+        let current_model = session_val.get("models")
+            .and_then(|m| m.get("currentModelId"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("none");
+        let mode_count = session_val.get("modes")
+            .and_then(|m| m.get("availableModes"))
+            .and_then(|a| a.as_array())
+            .map(|a| a.len())
+            .unwrap_or(0);
+        log::info!("[ACP] session_init for task={}: {} models (current={}), {} modes",
+            task_id, model_count, current_model, mode_count);
         use tauri::Emitter;
         let _ = app.emit("session_init", serde_json::json!({
             "taskId": task_id,
@@ -538,6 +575,9 @@ async fn run_acp_connection(
                     }
                     Err(e) => {
                         use tauri::Emitter;
+                        let _ = app.emit("task_error", serde_json::json!({
+                            "taskId": task_id, "message": e.to_string()
+                        }));
                         let _ = app.emit("debug_log", serde_json::json!({
                             "direction": "in", "category": "error", "type": "prompt-error",
                             "taskId": task_id, "summary": e.to_string(),
@@ -585,8 +625,7 @@ pub fn task_create(
     let now = Utc::now().to_rfc3339();
     let settings = settings_state.0.lock().map_err(|e| e.to_string())?;
     let auto_approve = params.auto_approve.unwrap_or(settings.settings.auto_approve);
-    let kiro_bin = settings.settings.kiro_bin.clone()
-        .unwrap_or_else(|| "kiro-cli".to_string());
+    let kiro_bin = settings.settings.kiro_bin.clone();
     drop(settings);
 
     let task = Task {
@@ -609,29 +648,25 @@ pub fn task_create(
         user_paused: None,
     };
 
-    state.tasks.lock().unwrap().insert(id.clone(), task.clone());
+    state.tasks.lock().map_err(|e| format!("Lock poisoned: {e}"))?.insert(id.clone(), task.clone());
 
-    let acp_state = Arc::new(AcpState {
-        tasks: Mutex::new(state.tasks.lock().unwrap().clone()),
-        connections: Mutex::new(HashMap::new()),
-        permission_resolvers: Mutex::new(HashMap::new()),
-    });
+    // Pass the app handle so spawn_connection can access managed state directly.
+    // Previously this created a cloned AcpState, causing permission updates and
+    // message history to diverge between the connection thread's copy and the
+    // real managed state.
 
-    // We need a shared reference to the actual state, not a copy.
-    // Use the app handle to get the managed state instead.
     let handle = spawn_connection(
         id.clone(),
         params.workspace,
         kiro_bin,
         auto_approve,
         app.clone(),
-        acp_state,
     )?;
 
     // Send initial prompt
     let _ = handle.cmd_tx.send(AcpCommand::Prompt(params.prompt));
 
-    state.connections.lock().unwrap().insert(id, handle);
+    state.connections.lock().map_err(|e| format!("Lock poisoned: {e}"))?.insert(id, handle);
 
     Ok(task)
 }
@@ -652,7 +687,7 @@ pub fn task_send_message(
 ) -> Result<Task, String> {
     // Push user message
     {
-        let mut tasks = state.tasks.lock().unwrap();
+        let mut tasks = state.tasks.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
         let task = tasks.get_mut(&task_id).ok_or("Task not found")?;
         task.messages.push(TaskMessage {
             role: "user".to_string(),
@@ -668,7 +703,7 @@ pub fn task_send_message(
 
     // Check if connection is alive, reconnect if needed
     let need_reconnect = {
-        let conns = state.connections.lock().unwrap();
+        let conns = state.connections.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
         match conns.get(&task_id) {
             Some(h) => !h.alive.load(std::sync::atomic::Ordering::SeqCst),
             None => true,
@@ -677,35 +712,34 @@ pub fn task_send_message(
 
     if need_reconnect {
         let settings = settings_state.0.lock().map_err(|e| e.to_string())?;
-        let kiro_bin = settings.settings.kiro_bin.clone().unwrap_or_else(|| "kiro-cli".to_string());
+        let kiro_bin = settings.settings.kiro_bin.clone();
         let auto_approve = settings.settings.auto_approve;
         drop(settings);
 
         let workspace = {
-            let tasks = state.tasks.lock().unwrap();
+            let tasks = state.tasks.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
             tasks.get(&task_id).map(|t| t.workspace.clone()).ok_or("Task not found")?
         };
 
         // Destroy old connection
-        if let Some(old) = state.connections.lock().unwrap().remove(&task_id) {
+        if let Some(old) = state.connections.lock().map_err(|e| format!("Lock poisoned: {e}"))?.remove(&task_id) {
             let _ = old.cmd_tx.send(AcpCommand::Kill);
         }
 
-        let acp_state = Arc::new(AcpState::default());
         let handle = spawn_connection(
             task_id.clone(), workspace, kiro_bin, auto_approve,
-            app.clone(), acp_state,
+            app.clone(),
         )?;
         let _ = handle.cmd_tx.send(AcpCommand::Prompt(message));
-        state.connections.lock().unwrap().insert(task_id.clone(), handle);
+        state.connections.lock().map_err(|e| format!("Lock poisoned: {e}"))?.insert(task_id.clone(), handle);
     } else {
-        let conns = state.connections.lock().unwrap();
+        let conns = state.connections.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
         if let Some(h) = conns.get(&task_id) {
             let _ = h.cmd_tx.send(AcpCommand::Prompt(message));
         }
     }
 
-    let tasks = state.tasks.lock().unwrap();
+    let tasks = state.tasks.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
     tasks.get(&task_id).cloned().ok_or_else(|| "Task not found".to_string())
 }
 
@@ -715,10 +749,10 @@ pub fn task_pause(
     state: tauri::State<'_, AcpState>,
     task_id: String,
 ) -> Result<Task, String> {
-    if let Some(h) = state.connections.lock().unwrap().get(&task_id) {
+    if let Some(h) = state.connections.lock().map_err(|e| format!("Lock poisoned: {e}"))?.get(&task_id) {
         let _ = h.cmd_tx.send(AcpCommand::Cancel);
     }
-    let mut tasks = state.tasks.lock().unwrap();
+    let mut tasks = state.tasks.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
     let task = tasks.get_mut(&task_id).ok_or("Task not found")?;
     task.status = "paused".to_string();
     task.user_paused = Some(true);
@@ -733,10 +767,10 @@ pub fn task_resume(
     state: tauri::State<'_, AcpState>,
     task_id: String,
 ) -> Result<Task, String> {
-    if let Some(h) = state.connections.lock().unwrap().get(&task_id) {
+    if let Some(h) = state.connections.lock().map_err(|e| format!("Lock poisoned: {e}"))?.get(&task_id) {
         let _ = h.cmd_tx.send(AcpCommand::Prompt("continue".to_string()));
     }
-    let mut tasks = state.tasks.lock().unwrap();
+    let mut tasks = state.tasks.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
     let task = tasks.get_mut(&task_id).ok_or("Task not found")?;
     task.status = "running".to_string();
     task.user_paused = Some(false);
@@ -752,10 +786,10 @@ pub fn task_cancel(
     task_id: String,
 ) -> Result<(), String> {
     // Kill connection
-    if let Some(h) = state.connections.lock().unwrap().remove(&task_id) {
+    if let Some(h) = state.connections.lock().map_err(|e| format!("Lock poisoned: {e}"))?.remove(&task_id) {
         let _ = h.cmd_tx.send(AcpCommand::Kill);
     }
-    let mut tasks = state.tasks.lock().unwrap();
+    let mut tasks = state.tasks.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
     if let Some(task) = tasks.get_mut(&task_id) {
         task.status = "cancelled".to_string();
         use tauri::Emitter;
@@ -766,10 +800,10 @@ pub fn task_cancel(
 
 #[tauri::command]
 pub fn task_delete(state: tauri::State<'_, AcpState>, task_id: String) -> Result<(), String> {
-    if let Some(h) = state.connections.lock().unwrap().remove(&task_id) {
+    if let Some(h) = state.connections.lock().map_err(|e| format!("Lock poisoned: {e}"))?.remove(&task_id) {
         let _ = h.cmd_tx.send(AcpCommand::Kill);
     }
-    state.tasks.lock().unwrap().remove(&task_id);
+    state.tasks.lock().map_err(|e| format!("Lock poisoned: {e}"))?.remove(&task_id);
     Ok(())
 }
 
@@ -781,8 +815,10 @@ pub fn task_allow_permission(
     request_id: String,
     option_id: Option<String>,
 ) -> Result<(), String> {
-    let resolved_id = option_id.unwrap_or_else(|| {
-        let tasks = state.tasks.lock().unwrap();
+    let resolved_id = if let Some(id) = option_id {
+        id
+    } else {
+        let tasks = state.tasks.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
         tasks.get(&task_id)
             .and_then(|t| t.pending_permission.as_ref())
             .and_then(|pp| {
@@ -792,15 +828,15 @@ pub fn task_allow_permission(
             })
             .map(|o| o.option_id.clone())
             .unwrap_or_else(|| "allow".to_string())
-    });
+    };
 
     // Resolve the permission
-    if let Some(tx) = state.permission_resolvers.lock().unwrap().remove(&request_id) {
+    if let Some(tx) = state.permission_resolvers.lock().map_err(|e| format!("Lock poisoned: {e}"))?.remove(&request_id) {
         let _ = tx.send(PermissionReply { option_id: resolved_id });
     }
 
     // Update task
-    let mut tasks = state.tasks.lock().unwrap();
+    let mut tasks = state.tasks.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
     if let Some(task) = tasks.get_mut(&task_id) {
         task.status = "running".to_string();
         task.pending_permission = None;
@@ -818,8 +854,10 @@ pub fn task_deny_permission(
     request_id: String,
     option_id: Option<String>,
 ) -> Result<(), String> {
-    let resolved_id = option_id.unwrap_or_else(|| {
-        let tasks = state.tasks.lock().unwrap();
+    let resolved_id = if let Some(id) = option_id {
+        id
+    } else {
+        let tasks = state.tasks.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
         tasks.get(&task_id)
             .and_then(|t| t.pending_permission.as_ref())
             .and_then(|pp| {
@@ -829,13 +867,13 @@ pub fn task_deny_permission(
             })
             .map(|o| o.option_id.clone())
             .unwrap_or_else(|| "reject".to_string())
-    });
+    };
 
-    if let Some(tx) = state.permission_resolvers.lock().unwrap().remove(&request_id) {
+    if let Some(tx) = state.permission_resolvers.lock().map_err(|e| format!("Lock poisoned: {e}"))?.remove(&request_id) {
         let _ = tx.send(PermissionReply { option_id: resolved_id });
     }
 
-    let mut tasks = state.tasks.lock().unwrap();
+    let mut tasks = state.tasks.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
     if let Some(task) = tasks.get_mut(&task_id) {
         task.status = "running".to_string();
         task.pending_permission = None;
@@ -851,7 +889,7 @@ pub fn set_mode(
     task_id: String,
     mode_id: String,
 ) -> Result<(), String> {
-    let conns = state.connections.lock().unwrap();
+    let conns = state.connections.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
     let h = conns.get(&task_id).ok_or("No connection for task")?;
     h.cmd_tx.send(AcpCommand::SetMode(mode_id)).map_err(|e| e.to_string())
 }
@@ -862,10 +900,10 @@ pub fn list_models(
     settings_state: tauri::State<'_, crate::commands::settings::SettingsState>,
     kiro_bin: Option<String>,
 ) -> Result<Value, String> {
-    let bin = kiro_bin.unwrap_or_else(|| {
-        settings_state.0.lock().unwrap().settings.kiro_bin.clone()
-            .unwrap_or_else(|| "kiro-cli".to_string())
-    });
+    let bin = match kiro_bin {
+        Some(b) => b,
+        None => settings_state.0.lock().map_err(|e| format!("Lock poisoned: {e}"))?.settings.kiro_bin.clone(),
+    };
 
     // Spawn a temporary connection to get models
     let (tx, rx) = std::sync::mpsc::channel();
@@ -934,19 +972,110 @@ pub fn list_models(
 
 #[tauri::command]
 pub fn probe_capabilities(
-    _app: tauri::AppHandle,
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AcpState>,
     settings_state: tauri::State<'_, crate::commands::settings::SettingsState>,
 ) -> Result<Value, String> {
-    // Reuse list_models logic but just check if it works
-    let bin = settings_state.0.lock().unwrap().settings.kiro_bin.clone()
-        .unwrap_or_else(|| "kiro-cli".to_string());
-
-    let output = std::process::Command::new(&bin)
-        .arg("--version")
-        .output();
-
-    match output {
-        Ok(o) if o.status.success() => Ok(serde_json::json!({ "ok": true })),
-        _ => Ok(serde_json::json!({ "ok": false })),
+    // Prevent concurrent probes (React StrictMode, HMR reloads)
+    if state.probe_running.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        log::info!("[ACP] probe_capabilities skipped (already running)");
+        return Ok(serde_json::json!({ "ok": true, "skipped": true }));
     }
+
+    let bin = settings_state.0.lock().map_err(|e| {
+        state.probe_running.store(false, std::sync::atomic::Ordering::SeqCst);
+        format!("Lock poisoned: {e}")
+    })?.settings.kiro_bin.clone();
+    log::info!("[ACP] probe_capabilities starting with bin={}", bin);
+
+    // Fire-and-forget: spawn the probe on a background thread and return immediately.
+    // Model/mode data is delivered via the "session_init" event, which the frontend
+    // already listens for. This avoids blocking the Tauri command thread for ~8 seconds.
+    let app_for_flag = app.clone();
+    let app_clone = app.clone();
+
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("Failed to create tokio runtime for probe");
+        let local = tokio::task::LocalSet::new();
+        let result = local.block_on(&rt, async {
+            let mut child = tokio::process::Command::new(&bin)
+                .arg("acp")
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::null())
+                .env("PATH", format!("/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:{}", std::env::var("PATH").unwrap_or_default()))
+                .spawn()
+                .map_err(|e| format!("Failed to spawn: {e}"))?;
+
+            let stdin = child.stdin.take().ok_or("No stdin")?;
+            let stdout = child.stdout.take().ok_or("No stdout")?;
+
+            struct ProbeClient;
+            #[async_trait::async_trait(?Send)]
+            impl acp::Client for ProbeClient {
+                async fn session_notification(&self, _: acp::SessionNotification) -> acp::Result<()> { Ok(()) }
+                async fn request_permission(&self, _: acp::RequestPermissionRequest) -> acp::Result<acp::RequestPermissionResponse> {
+                    Ok(serde_json::from_value(serde_json::json!({"outcome":{"outcome":"cancelled"}})).unwrap())
+                }
+                async fn ext_notification(&self, _: acp::ExtNotification) -> acp::Result<()> { Ok(()) }
+            }
+
+            let (conn, io_future) = acp::ClientSideConnection::new(
+                ProbeClient, stdin.compat_write(), stdout.compat(),
+                |fut| { tokio::task::spawn_local(fut); },
+            );
+            tokio::task::spawn_local(async { let _ = io_future.await; });
+
+            conn.initialize(
+                acp::InitializeRequest::new(acp::ProtocolVersion::V1)
+                    .client_info(acp::Implementation::new("kirodex", "0.1.0"))
+            ).await.map_err(|e| format!("Init failed: {e}"))?;
+
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+            let session = conn.new_session(
+                acp::NewSessionRequest::new(std::path::PathBuf::from(&home))
+            ).await.map_err(|e| format!("Session failed: {e}"))?;
+
+            let session_val = serde_json::to_value(&session).unwrap_or_default();
+
+            let model_count = session_val.get("models")
+                .and_then(|m| m.get("availableModels"))
+                .and_then(|a| a.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0);
+            let current_model = session_val.get("models")
+                .and_then(|m| m.get("currentModelId"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("none");
+            log::info!("[ACP] probe session_init: {} models (current={})", model_count, current_model);
+
+            use tauri::Emitter;
+            let _ = app_clone.emit("session_init", serde_json::json!({
+                "taskId": "__probe__",
+                "models": session_val.get("models"),
+                "modes": session_val.get("modes"),
+                "configOptions": session_val.get("configOptions"),
+            }));
+
+            let _ = child.kill().await;
+            Ok::<(), String>(())
+        });
+
+        // ALWAYS reset the probe guard when the thread exits
+        use tauri::Manager;
+        if let Some(acp_state) = app_for_flag.try_state::<AcpState>() {
+            acp_state.probe_running.store(false, std::sync::atomic::Ordering::SeqCst);
+        }
+
+        match result {
+            Ok(()) => log::info!("[ACP] probe_capabilities succeeded"),
+            Err(e) => log::warn!("[ACP] probe_capabilities failed: {}", e),
+        }
+    });
+
+    // Return immediately — models/modes arrive via session_init event
+    Ok(serde_json::json!({ "ok": true, "async": true }))
 }

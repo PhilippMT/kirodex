@@ -108,10 +108,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         [workspace]: { ...existing, ...patch },
       },
     }
-    set({ settings: updated })
-    // Apply immediately to active state
-    if (patch.modelId !== undefined) set({ currentModelId: patch.modelId })
-    // Persist async
+    // Single set() to avoid two render cycles
+    set({
+      settings: updated,
+      ...(patch.modelId !== undefined ? { currentModelId: patch.modelId } : {}),
+    })
     ipc.saveSettings(updated).catch(() => {})
   },
 }))

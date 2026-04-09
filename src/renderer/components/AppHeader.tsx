@@ -1,13 +1,34 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Pause, Play, XCircle, GitCompareArrows, GitCommitHorizontal, ChevronDown } from 'lucide-react'
+import { Pause, Play, XCircle, GitCompareArrows, GitCommitHorizontal, ChevronDown, TerminalSquare, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useTaskStore } from '@/stores/taskStore'
 import { useDiffStore } from '@/stores/diffStore'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ipc } from '@/lib/ipc'
 import { cn } from '@/lib/utils'
 import type { TaskStatus } from '@/types'
+
+// ── Window drag handler ──────────────────────────────────────
+// data-tauri-drag-region only works on the element itself, not children.
+// We use startDragging() on mousedown for reliable dragging across the
+// entire header, excluding interactive elements (buttons, inputs, links).
+const INTERACTIVE = 'button, a, input, textarea, select, [role="button"], [data-no-drag]'
+
+const handleHeaderMouseDown = (e: React.MouseEvent<HTMLElement>) => {
+  // Only primary button
+  if (e.button !== 0) return
+  // Skip interactive elements
+  if ((e.target as HTMLElement).closest(INTERACTIVE)) return
+  if (e.detail === 2) {
+    // Double-click: toggle maximize
+    getCurrentWindow().toggleMaximize()
+  } else {
+    getCurrentWindow().startDragging()
+  }
+}
 
 const statusVariant: Record<TaskStatus, 'default' | 'secondary' | 'outline' | 'destructive' | 'success' | 'warning'> = {
   running: 'success',
@@ -167,12 +188,17 @@ const Sep = () => <span className="text-muted-foreground/25 select-none">/</span
 interface AppHeaderProps {
   sidePanelOpen: boolean
   onToggleSidePanel: () => void
+  isSidebarCollapsed: boolean
+  onToggleSidebar: () => void
 }
 
-export function AppHeader({ sidePanelOpen, onToggleSidePanel }: AppHeaderProps) {
+function AppHeaderInner({ sidePanelOpen, onToggleSidePanel, isSidebarCollapsed, onToggleSidebar }: AppHeaderProps) {
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId)
   const task = useTaskStore((s) => selectedTaskId ? s.tasks[selectedTaskId] : null)
+  const pendingWorkspace = useTaskStore((s) => s.pendingWorkspace)
   const taskStatus = task?.status
+  const terminalOpen = useTaskStore((s) => s.terminalOpen)
+  const toggleTerminal = useTaskStore((s) => s.toggleTerminal)
   const diffStats = useDiffStore((s) => s.stats)
   const fetchDiff = useDiffStore((s) => s.fetchDiff)
 
@@ -185,14 +211,16 @@ export function AppHeader({ sidePanelOpen, onToggleSidePanel }: AppHeaderProps) 
   const handleResume = useCallback(() => { if (task) ipc.resumeTask(task.id) }, [task?.id])
   const handleCancel = useCallback(() => { if (task) ipc.cancelTask(task.id) }, [task?.id])
 
-  const projectName = task?.workspace.split('/').pop() ?? null
+  // Show workspace from task or from pendingWorkspace (before first message)
+  const workspace = task?.workspace ?? pendingWorkspace
+  const projectName = workspace?.split('/').pop() ?? null
   const canPause = task?.status === 'running'
   const canResume = task?.status === 'paused' && !!task.userPaused
   const canCancel = task?.status === 'running' || (task?.status === 'paused' && !!task?.userPaused)
   const hasStats = diffStats.additions > 0 || diffStats.deletions > 0
 
   return (
-    <header className="drag-region flex h-[44px] shrink-0 items-center gap-3 border-b border-border px-4 pl-[90px]">
+    <header onMouseDown={handleHeaderMouseDown} className="flex h-[44px] shrink-0 items-center gap-3 border-b border-border px-4 pl-[90px] select-none [-webkit-user-select:none]">
       {/* Breadcrumb left */}
       <nav className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
         {/* Logo / app name */}
@@ -203,25 +231,46 @@ export function AppHeader({ sidePanelOpen, onToggleSidePanel }: AppHeaderProps) 
           Beta
         </span>
 
+        {/* Toggle sidebar */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label="Toggle sidebar"
+              aria-pressed={!isSidebarCollapsed}
+              onClick={onToggleSidebar}
+              className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              {isSidebarCollapsed ? <PanelLeftOpen className="size-4" aria-hidden /> : <PanelLeftClose className="size-4" aria-hidden />}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Toggle sidebar <kbd className="ml-1 rounded bg-muted px-1 py-0.5 text-[10px]">⌘B</kbd></TooltipContent>
+        </Tooltip>
+
         {/* Project */}
         {projectName && (
           <>
             <Sep />
-            <span className="min-w-0 max-w-[160px] truncate text-[13px] text-muted-foreground" title={task?.workspace}>
+            <span className="min-w-0 max-w-[160px] truncate text-[13px] text-muted-foreground" title={workspace ?? undefined}>
               {projectName}
             </span>
           </>
         )}
 
         {/* Thread */}
-        {task && (
+        {task ? (
           <>
             <Sep />
             <span className="min-w-0 max-w-[200px] truncate text-[13px] font-medium text-foreground" title={task.name}>
               {task.name}
             </span>
           </>
-        )}
+        ) : pendingWorkspace ? (
+          <>
+            <Sep />
+            <span className="text-[13px] text-muted-foreground/60">New thread</span>
+          </>
+        ) : null}
 
         {/* Status badge */}
         {task && !(task.status === 'paused' && !task.userPaused) && (
@@ -231,11 +280,17 @@ export function AppHeader({ sidePanelOpen, onToggleSidePanel }: AppHeaderProps) 
         )}
       </nav>
 
-      {/* Actions (right) — only when a task is selected */}
-      {task && (
+      {/* Actions (right) — show editor when any workspace is active, task actions when task exists */}
+      {workspace && (
         <div className="flex shrink-0 items-center gap-2">
-          <OpenInEditorGroup workspace={task.workspace} />
-          <GitActionsGroup taskId={task.id} workspace={task.workspace} />
+          <ErrorBoundary fallback={null}>
+            <OpenInEditorGroup workspace={workspace} />
+          </ErrorBoundary>
+          {task && (
+            <ErrorBoundary fallback={null}>
+              <GitActionsGroup taskId={task.id} workspace={task.workspace} />
+            </ErrorBoundary>
+          )}
 
           <Tooltip>
             <TooltipTrigger asChild>
@@ -251,7 +306,7 @@ export function AppHeader({ sidePanelOpen, onToggleSidePanel }: AppHeaderProps) 
               >
                 <GitCompareArrows className="size-3" aria-hidden />
                 {hasStats && (
-                  <span className="flex items-center gap-1 tabular-nums">
+                  <span className={cn('flex items-center gap-1 tabular-nums', canPause && 'animate-pulse')}>
                     {diffStats.fileCount > 0 && (
                       <span className="text-[10px] text-muted-foreground">{diffStats.fileCount}</span>
                     )}
@@ -262,6 +317,24 @@ export function AppHeader({ sidePanelOpen, onToggleSidePanel }: AppHeaderProps) 
               </button>
             </TooltipTrigger>
             <TooltipContent side="bottom">Files changed</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label="Toggle terminal"
+                aria-pressed={terminalOpen}
+                onClick={toggleTerminal}
+                className={cn(
+                  'inline-flex h-6 items-center rounded-md border border-input px-1.5 text-xs shadow-xs/5 transition-colors',
+                  terminalOpen ? 'bg-input/64 dark:bg-input text-foreground' : 'bg-popover hover:bg-accent/50 dark:bg-input/32 text-muted-foreground',
+                )}
+              >
+                <TerminalSquare className="size-3" aria-hidden />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Terminal</TooltipContent>
           </Tooltip>
 
           {canPause && (
@@ -291,5 +364,19 @@ export function AppHeader({ sidePanelOpen, onToggleSidePanel }: AppHeaderProps) 
         </div>
       )}
     </header>
+  )
+}
+
+const HeaderFallback = () => (
+  <header data-tauri-drag-region className="drag-region flex h-[44px] shrink-0 items-center gap-3 border-b border-border px-4 pl-[90px]">
+    <span className="text-sm font-medium tracking-tight text-muted-foreground">Kirodex</span>
+  </header>
+)
+
+export function AppHeader(props: AppHeaderProps) {
+  return (
+    <ErrorBoundary fallback={<HeaderFallback />}>
+      <AppHeaderInner {...props} />
+    </ErrorBoundary>
   )
 }

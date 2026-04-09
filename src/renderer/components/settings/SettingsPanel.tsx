@@ -149,7 +149,7 @@ export function SettingsPanel() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           {tab === 'general' && (
             <div className="space-y-4">
               <div>

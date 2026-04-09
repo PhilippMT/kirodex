@@ -1,8 +1,8 @@
 import { memo, useState } from 'react'
 import {
-  ChevronDown, ChevronRight, Check, Loader2, X, AlertCircle,
+  ChevronDown, ChevronRight, Check, Loader2, X,
   FileText, FileEdit, Trash2, FolderSearch, Terminal, Brain,
-  Globe, ArrowRightLeft, Wrench,
+  Globe, ArrowRightLeft, Wrench, Zap,
   type LucideIcon,
 } from 'lucide-react'
 import type { ToolCall, ToolKind } from '@/types'
@@ -33,19 +33,13 @@ function getToolIcon(kind?: ToolKind, title?: string): LucideIcon {
   return Wrench
 }
 
-const statusMeta: Record<string, { icon: LucideIcon; className: string; label: string }> = {
-  pending: { icon: Loader2, className: 'text-muted-foreground/50', label: 'Pending' },
-  in_progress: { icon: Loader2, className: 'animate-spin text-primary', label: 'Running' },
-  completed: { icon: Check, className: 'text-emerald-400', label: 'Done' },
-  failed: { icon: X, className: 'text-red-400', label: 'Failed' },
-}
+// ── Compact single-line tool call entry ──────────────────────
 
-const ToolCallItem = memo(function ToolCallItem({ toolCall }: { toolCall: ToolCall }) {
+const ToolCallEntry = memo(function ToolCallEntry({ toolCall }: { toolCall: ToolCall }) {
   const [expanded, setExpanded] = useState(false)
   const Icon = getToolIcon(toolCall.kind, toolCall.title)
-  const status = statusMeta[toolCall.status] ?? statusMeta.pending
-  const StatusIcon = status.icon
   const isRunning = toolCall.status === 'in_progress'
+  const isFailed = toolCall.status === 'failed'
 
   const firstPath = toolCall.locations?.[0]?.path
   const shortPath = firstPath ? firstPath.split('/').slice(-2).join('/') : null
@@ -57,37 +51,41 @@ const ToolCallItem = memo(function ToolCallItem({ toolCall }: { toolCall: ToolCa
   )
 
   return (
-    <div className={cn(
-      'rounded-lg border transition-colors',
-      toolCall.status === 'failed'
-        ? 'border-red-500/20 bg-red-500/5'
-        : isRunning
-          ? 'border-primary/20 bg-primary/5'
-          : 'border-border/50 bg-card/30',
-    )}>
+    <div>
       <button
         onClick={() => hasContent && setExpanded(!expanded)}
         className={cn(
-          'flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors',
+          'flex w-full items-center gap-2 rounded-md px-2 py-1 text-[11px] text-left transition-colors',
           hasContent && 'hover:bg-accent/10 cursor-pointer',
           !hasContent && 'cursor-default',
         )}
       >
-        {hasContent ? (
-          expanded ? <ChevronDown className="size-3 shrink-0 text-muted-foreground/50" /> : <ChevronRight className="size-3 shrink-0 text-muted-foreground/50" />
-        ) : (
-          <span className="size-3 shrink-0" />
-        )}
-        <Icon className={cn('size-3.5 shrink-0', isRunning ? 'text-primary' : 'text-muted-foreground/60')} />
-        <span className={cn('flex-1 truncate font-medium', isRunning && 'text-foreground')}>{toolCall.title}</span>
+        <Icon className={cn(
+          'size-3 shrink-0',
+          isRunning ? 'text-primary' : isFailed ? 'text-red-400' : 'text-muted-foreground/40',
+        )} />
+        <span className={cn(
+          'flex-1 truncate',
+          isRunning ? 'text-foreground' : 'text-muted-foreground/70',
+        )}>
+          {toolCall.title}
+        </span>
         {shortPath && (
-          <span className="hidden sm:inline max-w-[120px] truncate text-[10px] font-mono text-muted-foreground/40">{shortPath}</span>
+          <span className="hidden sm:inline max-w-[140px] truncate font-mono text-[10px] text-muted-foreground/30">
+            {shortPath}
+          </span>
         )}
-        <StatusIcon className={cn('size-3 shrink-0', status.className)} />
+        {isRunning ? (
+          <Loader2 className="size-2.5 shrink-0 animate-spin text-primary" />
+        ) : isFailed ? (
+          <X className="size-2.5 shrink-0 text-red-400" />
+        ) : toolCall.status === 'completed' ? (
+          <Check className="size-2.5 shrink-0 text-emerald-400/60" />
+        ) : null}
       </button>
 
       {expanded && hasContent && (
-        <div className="border-t border-border/30 px-3 py-2 text-xs space-y-2">
+        <div className="ml-5 mr-2 mb-1 mt-0.5 rounded-md border border-border/30 bg-background/50 px-2.5 py-2 text-xs space-y-2">
           {toolCall.content?.map((item, i) => (
             <div key={i}>
               {item.type === 'diff' && item.path && (
@@ -144,15 +142,84 @@ const ToolCallItem = memo(function ToolCallItem({ toolCall }: { toolCall: ToolCa
   )
 })
 
+// ── Collapsible work group card ──────────────────────────────
+
+const MAX_VISIBLE_DEFAULT = 6
+
 interface ToolCallDisplayProps {
   toolCalls: ToolCall[]
 }
 
 export const ToolCallDisplay = memo(function ToolCallDisplay({ toolCalls }: ToolCallDisplayProps) {
+  const [expanded, setExpanded] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+
   if (!toolCalls.length) return null
+
+  const completedCount = toolCalls.filter((tc) => tc.status === 'completed').length
+  const runningCount = toolCalls.filter((tc) => tc.status === 'in_progress').length
+  const failedCount = toolCalls.filter((tc) => tc.status === 'failed').length
+
+  const visibleCalls = showAll ? toolCalls : toolCalls.slice(0, MAX_VISIBLE_DEFAULT)
+  const hasMore = toolCalls.length > MAX_VISIBLE_DEFAULT
+
   return (
-    <div className="my-2 space-y-1">
-      {toolCalls.map((tc) => <ToolCallItem key={tc.toolCallId} toolCall={tc} />)}
+    <div className="rounded-lg border border-border/30 bg-card/20">
+      {/* Header */}
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-accent/5"
+      >
+        {expanded ? (
+          <ChevronDown className="size-3 shrink-0 text-muted-foreground/40" />
+        ) : (
+          <ChevronRight className="size-3 shrink-0 text-muted-foreground/40" />
+        )}
+        <Zap className="size-3 shrink-0 text-amber-400/60" />
+        <span className="text-[11px] font-medium text-muted-foreground/60">
+          Tool calls
+        </span>
+        <span className="text-[10px] tabular-nums text-muted-foreground/35">
+          ({toolCalls.length})
+        </span>
+
+        {/* Status summary pills */}
+        <div className="flex-1" />
+        {runningCount > 0 && (
+          <span className="flex items-center gap-1 text-[10px] text-primary">
+            <Loader2 className="size-2.5 animate-spin" />
+            {runningCount}
+          </span>
+        )}
+        {failedCount > 0 && (
+          <span className="flex items-center gap-1 text-[10px] text-red-400">
+            <X className="size-2.5" />
+            {failedCount}
+          </span>
+        )}
+        {completedCount > 0 && runningCount === 0 && failedCount === 0 && (
+          <Check className="size-3 text-emerald-400/50" />
+        )}
+      </button>
+
+      {/* Expanded tool list */}
+      {expanded && (
+        <div className="border-t border-border/20 py-0.5">
+          {visibleCalls.map((tc) => (
+            <ToolCallEntry key={tc.toolCallId} toolCall={tc} />
+          ))}
+          {hasMore && !showAll && (
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="w-full px-2 py-1 text-[10px] text-muted-foreground/40 transition-colors hover:text-muted-foreground/60"
+            >
+              +{toolCalls.length - MAX_VISIBLE_DEFAULT} more
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 })

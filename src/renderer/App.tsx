@@ -18,6 +18,83 @@ import { useDebugStore } from '@/stores/debugStore'
 import { useKiroStore, initKiroListeners } from '@/stores/kiroStore'
 import { useShallow } from 'zustand/react/shallow'
 
+function EmptyState() {
+  const projects = useTaskStore((s) => s.projects)
+  const handleNew = useCallback(() => {
+    if (projects.length > 0) {
+      useTaskStore.getState().setPendingWorkspace(projects[0])
+    } else {
+      useTaskStore.getState().setNewProjectOpen(true)
+    }
+  }, [projects])
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Skeleton messages at low opacity */}
+      <div className="flex flex-1 flex-col gap-4 px-6 pt-8 opacity-[0.07] select-none" aria-hidden>
+        <div className="ml-auto flex max-w-[55%] flex-col gap-1.5 items-end">
+          <div className="h-3 w-48 rounded-full bg-foreground" />
+          <div className="h-3 w-32 rounded-full bg-foreground" />
+        </div>
+        <div className="flex max-w-[65%] flex-col gap-1.5">
+          <div className="h-3 w-64 rounded-full bg-foreground" />
+          <div className="h-3 w-80 rounded-full bg-foreground" />
+          <div className="h-3 w-56 rounded-full bg-foreground" />
+        </div>
+        <div className="ml-auto flex max-w-[45%] flex-col gap-1.5 items-end">
+          <div className="h-3 w-40 rounded-full bg-foreground" />
+        </div>
+        <div className="flex max-w-[60%] flex-col gap-1.5">
+          <div className="h-3 w-72 rounded-full bg-foreground" />
+          <div className="h-3 w-48 rounded-full bg-foreground" />
+          <div className="h-3 w-64 rounded-full bg-foreground" />
+          <div className="h-3 w-36 rounded-full bg-foreground" />
+        </div>
+      </div>
+
+      {/* Ghost ChatInput */}
+      <div className="px-4 pt-1.5 pb-3 opacity-30 pointer-events-none select-none sm:px-6 sm:pt-2 sm:pb-4" aria-hidden>
+        <div className="mx-auto w-full max-w-2xl lg:max-w-3xl xl:max-w-4xl">
+          <div className="rounded-[20px] border border-border bg-card">
+            <div className="px-3 pb-2 pt-3.5 sm:px-4 sm:pt-4">
+              <p className="min-h-[70px] text-[14px] leading-relaxed text-muted-foreground/35">Ask anything, or press / for commands</p>
+            </div>
+            <div className="flex items-center justify-between gap-1.5 px-3 pb-3 sm:px-4">
+              <div className="flex items-center gap-1.5">
+                <div className="h-4 w-20 rounded bg-muted-foreground/10" />
+                <div className="h-3.5 w-px bg-border/60" />
+                <div className="h-4 w-14 rounded bg-muted-foreground/10" />
+                <div className="h-3.5 w-px bg-border/60" />
+                <div className="h-4 w-12 rounded bg-muted-foreground/10" />
+              </div>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/90 opacity-30">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                  <path d="M7 11.5V2.5M7 2.5L3 6.5M7 2.5L11 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-primary-foreground" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* New thread CTA over the skeleton */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none">
+        <p className="text-sm text-muted-foreground/50 select-none">Start a conversation with Kiro</p>
+        <button
+          type="button"
+          onClick={handleNew}
+          className="pointer-events-auto inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+            <line x1="7" y1="2" x2="7" y2="12" /><line x1="2" y1="7" x2="12" y2="7" />
+          </svg>
+          New Thread
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function App() {
   const { view, selectedTaskId, pendingWorkspace } = useTaskStore(
     useShallow((s) => ({ view: s.view, selectedTaskId: s.selectedTaskId, pendingWorkspace: s.pendingWorkspace }))
@@ -30,6 +107,7 @@ export function App() {
     useSettingsStore.getState().setActiveWorkspace(workspace)
   }, [selectedTaskId])
   const [sidePanelOpen, setSidePanelOpen] = useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   useEffect(() => {
     useTaskStore.getState().loadTasks()
@@ -41,8 +119,21 @@ export function App() {
     return () => { cleanupTask(); cleanupKiro() }
   }, [])
 
+  // ⌘B keyboard shortcut to toggle sidebar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey && e.key === 'b') {
+        e.preventDefault()
+        setIsSidebarCollapsed((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   const toggleSidePanel = useCallback(() => setSidePanelOpen((o) => !o), [])
   const closeSidePanel = useCallback(() => setSidePanelOpen(false), [])
+  const toggleSidebar = useCallback(() => setIsSidebarCollapsed((v) => !v), [])
 
   const showPlayground = view === 'playground'
 
@@ -51,17 +142,22 @@ export function App() {
       <div className="flex h-screen flex-col bg-background text-foreground">
         {/* Top-level breadcrumb header */}
         <ErrorBoundary>
-          <AppHeader sidePanelOpen={sidePanelOpen} onToggleSidePanel={toggleSidePanel} />
+          <AppHeader
+            sidePanelOpen={sidePanelOpen}
+            onToggleSidePanel={toggleSidePanel}
+            isSidebarCollapsed={isSidebarCollapsed}
+            onToggleSidebar={toggleSidebar}
+          />
         </ErrorBoundary>
 
         {/* Main area: sidebar + content + side panel */}
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <ErrorBoundary>
-            <TaskSidebar />
+            {!isSidebarCollapsed && <TaskSidebar />}
           </ErrorBoundary>
-          <main className="flex min-h-0 flex-1 overflow-hidden">
+          <main className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
             <ErrorBoundary>
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                 {showPlayground ? (
                   <Playground />
                 ) : selectedTaskId ? (
@@ -69,11 +165,7 @@ export function App() {
                 ) : pendingWorkspace ? (
                   <PendingChat workspace={pendingWorkspace} />
                 ) : (
-                  <div className="flex flex-1 items-center justify-center">
-                    <p className="text-sm text-muted-foreground/50 select-none">
-                      Select a thread or create a new one to get started.
-                    </p>
-                  </div>
+                  <EmptyState />
                 )}
               </div>
             </ErrorBoundary>

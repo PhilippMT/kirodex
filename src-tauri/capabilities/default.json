@@ -7,25 +7,19 @@
     "core:default",
     "dialog:default",
     "dialog:allow-open",
-    "shell:default",
     "shell:allow-open",
-    "shell:allow-execute",
-    "shell:allow-spawn",
-    "shell:allow-stdin-write",
-    "shell:allow-kill",
-    "fs:default",
     "fs:allow-read-file",
     "fs:allow-write-file",
     "fs:allow-exists",
     "fs:allow-mkdir",
     "fs:allow-read-dir",
+    "core:window:allow-start-dragging",
+    "core:window:allow-toggle-maximize",
     {
       "identifier": "fs:scope",
       "allow": [
-        { "path": "$HOME/**" },
-        { "path": "$APPDATA/**" },
-        { "path": "/usr/**" },
-        { "path": "/opt/**" }
+        { "path": "$HOME/.kiro/**" },
+        { "path": "$APPDATA/**" }
       ]
     }
   ]

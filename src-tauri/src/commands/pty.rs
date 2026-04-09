@@ -1,8 +1,20 @@
 use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::Mutex;
 use tauri::Emitter;
+
+#[derive(Serialize, Clone)]
+struct PtyDataPayload {
+    id: String,
+    data: String,
+}
+
+#[derive(Serialize, Clone)]
+struct PtyExitPayload {
+    id: String,
+}
 
 pub struct PtyInstance {
     master: Box<dyn MasterPty + Send>,
@@ -23,9 +35,11 @@ pub fn pty_create(
     window: tauri::Window,
     id: String,
     cwd: String,
-    cols: u16,
-    rows: u16,
+    cols: Option<u16>,
+    rows: Option<u16>,
 ) -> Result<(), String> {
+    let cols = cols.unwrap_or(80);
+    let rows = rows.unwrap_or(24);
     let pty_system = native_pty_system();
     let pair = pty_system
         .openpty(PtySize {
@@ -46,12 +60,21 @@ pub fn pty_create(
         let mut buf = [0u8; 4096];
         loop {
             match reader.read(&mut buf) {
-                Ok(0) => break,
+                Ok(0) => {
+                    let _ = window.emit("pty_exit", PtyExitPayload { id: event_id.clone() });
+                    break;
+                }
                 Ok(n) => {
                     let data = String::from_utf8_lossy(&buf[..n]).to_string();
-                    let _ = window.emit(&format!("pty-data-{}", event_id), &data);
+                    let _ = window.emit(
+                        "pty_data",
+                        PtyDataPayload { id: event_id.clone(), data },
+                    );
                 }
-                Err(_) => break,
+                Err(_) => {
+                    let _ = window.emit("pty_exit", PtyExitPayload { id: event_id.clone() });
+                    break;
+                }
             }
         }
     });
