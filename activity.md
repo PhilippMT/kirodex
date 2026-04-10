@@ -1,3 +1,9 @@
+## 2026-04-10 12:27 GST (Dubai)
+
+- Staged all files (61 changed: 59 modified, 3 new, 1 untracked)
+- Committed as `feat: add changed files summary, keyboard shortcuts, and UI polish` (cc7703a)
+- Pushed 9 commits to origin/main
+
 ## 2026-04-10 11:58 GST (Dubai)
 
 - Created `todo.md` with full project research: current state, completed tasks, in-progress work, and open questions
@@ -1058,3 +1064,17 @@ Build: TS ✓, Vite ✓
 
 ## 2026-04-10 12:26 (Dubai)
 - Removed "Author" section (Sabeur Thabti) from README.md
+
+## 2026-04-10 12:40 (Dubai)
+- Added "Author" (Sabeur Thabti) and "Sponsor" (Lastline.app) sections to README.md
+
+## 2026-04-10 12:42 GST (Dubai)
+
+- Removed "Author" and "Sponsor" sections from README.md
+
+## 2026-04-10 12:44 (Dubai)
+- Added "Author" (Sabeur Thabti) and "Sponsor" ([Lastline.app](https://lastline.app)) sections to README.md before the License section.
+
+## 2026-04-10 12:45 (Dubai)
+- Bumped package.json version from 0.6.0 to 0.7.0
+- Added `"author": "Sabeur Thabti"` to package.json

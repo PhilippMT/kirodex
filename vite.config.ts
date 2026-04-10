@@ -40,7 +40,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes("@pierre")) return "vendor-diffs";
+          if (id.includes("@pierre") || id.includes("node_modules/diff/")) return "vendor-diffs";
           if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/")) return "vendor-react";
           if (id.includes("react-markdown") || id.includes("remark") || id.includes("rehype") || id.includes("unified") || id.includes("mdast") || id.includes("hast") || id.includes("micromark")) return "vendor-markdown";
           if (id.includes("xterm") || id.includes("@xterm")) return "vendor-xterm";
@@ -49,6 +49,9 @@ export default defineConfig({
         },
       },
     },
+  },
+  optimizeDeps: {
+    include: ['diff'],
   },
   server: {
     port: 5174,

@@ -1,5 +1,13 @@
 import type { TaskMessage, ToolCall } from '@/types'
 
+/** Check if a tool call represents a file mutation (edit, delete, move) */
+function isFileMutation(kind?: string, title?: string): boolean {
+  if (kind === 'edit' || kind === 'delete' || kind === 'move') return true
+  if (kind) return false
+  const t = (title ?? '').toLowerCase()
+  return t.includes('edit') || t.includes('write') || t.includes('patch') || t.includes('delet') || t.includes('mov') || t.includes('renam')
+}
+
 // ── Timeline row types ───────────────────────────────────────────
 
 export type TimelineRowKind = 'user-message' | 'system-message' | 'assistant-text' | 'work' | 'working' | 'changed-files'
@@ -115,7 +123,7 @@ export function deriveTimeline(
       })
       // Inject changed-files summary after work rows with file mutations
       const hasFileChanges = msg.toolCalls.some(
-        (tc) => tc.status === 'completed' && (tc.kind === 'edit' || tc.kind === 'delete' || tc.kind === 'move'),
+        (tc) => tc.status === 'completed' && isFileMutation(tc.kind, tc.title),
       )
       if (hasFileChanges) {
         rows.push({

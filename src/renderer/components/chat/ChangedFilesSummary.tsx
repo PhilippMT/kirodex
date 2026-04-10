@@ -1,7 +1,8 @@
 import { memo, useMemo, useState, useCallback } from 'react'
-import { IconFile, IconFolder, IconChevronDown, IconChevronRight, IconEye, IconFileDiff } from '@tabler/icons-react'
+import { IconChevronRight, IconFolder, IconFolderOpen } from '@tabler/icons-react'
 import { cn } from '@/lib/utils'
 import { useDiffStore } from '@/stores/diffStore'
+import { isFileMutation } from './tool-call-utils'
 import type { ToolCall } from '@/types'
 import type { ChangedFilesRow } from '@/lib/timeline'
 
@@ -10,6 +11,7 @@ import type { ChangedFilesRow } from '@/lib/timeline'
 interface FileStats {
   readonly path: string
   readonly name: string
+  readonly ext: string
   readonly additions: number
   readonly deletions: number
 }
@@ -23,20 +25,48 @@ interface DirGroup {
 
 const MAX_VISIBLE_FILES = 30
 
-// ── Pure helpers (no side effects, safe for useMemo) ─────────────
+// ── VS Code file icon CDN ────────────────────────────────────────
 
-/** Count lines in a string without allocating an array */
+const VSCODE_ICON_BASE = 'https://cdn.jsdelivr.net/gh/vscode-icons/vscode-icons@v12.17.0/icons'
+
+const EXT_ICON_MAP: Record<string, string> = {
+  ts: 'file_type_typescript',
+  tsx: 'file_type_reactts',
+  js: 'file_type_js',
+  jsx: 'file_type_reactjs',
+  json: 'file_type_json',
+  md: 'file_type_markdown',
+  css: 'file_type_css',
+  html: 'file_type_html',
+  rs: 'file_type_rust',
+  toml: 'file_type_toml',
+  yaml: 'file_type_yaml',
+  yml: 'file_type_yaml',
+  py: 'file_type_python',
+  go: 'file_type_go',
+  sh: 'file_type_shell',
+  svg: 'file_type_svg',
+  png: 'file_type_image',
+  jpg: 'file_type_image',
+  lock: 'file_type_lock',
+}
+
+function getFileIconUrl(ext: string): string {
+  const icon = EXT_ICON_MAP[ext] ?? 'default_file'
+  return `${VSCODE_ICON_BASE}/${icon}.svg`
+}
+
+// ── Pure helpers ─────────────────────────────────────────────────
+
 function countLines(text: string): number {
   if (!text) return 0
   let n = 0
   for (let i = 0; i < text.length; i++) {
     if (text.charCodeAt(i) === 10) n++
   }
-  // count last line if no trailing newline
   return text.endsWith('\n') ? n : n + 1
 }
 
-/** Cheap line-count diff: compare old/new line counts */
 function computeLineDelta(oldText: string | null | undefined, newText: string | null | undefined): { additions: number; deletions: number } {
   const oldLines = countLines(oldText ?? '')
   const newLines = countLines(newText ?? '')
@@ -46,37 +76,27 @@ function computeLineDelta(oldText: string | null | undefined, newText: string | 
     : { additions: 0, deletions: -delta }
 }
 
-/** Extract file paths that actually appear in the git diff (cheap scan, no full parse) */
 function extractDiffFilePaths(rawDiff: string): Set<string> {
   const paths = new Set<string>()
   if (!rawDiff) return paths
-  // Match "diff --git a/path b/path" or "+++ b/path" lines
   const lines = rawDiff.split('\n')
   for (const line of lines) {
-    if (line.startsWith('+++ b/')) {
-      paths.add(line.slice(6))
-    } else if (line.startsWith('+++ ') && !line.startsWith('+++ /dev/null')) {
-      // Some diffs omit the b/ prefix
-      paths.add(line.slice(4))
-    }
+    if (line.startsWith('+++ b/')) paths.add(line.slice(6))
+    else if (line.startsWith('+++ ') && !line.startsWith('+++ /dev/null')) paths.add(line.slice(4))
   }
   return paths
 }
 
-/** Extract per-file stats from completed edit/delete/move tool calls, validated against actual diff */
 function extractFileStats(toolCalls: readonly ToolCall[], rawDiff: string): FileStats[] {
   const diffPaths = extractDiffFilePaths(rawDiff)
   const statsMap = new Map<string, { additions: number; deletions: number }>()
 
   for (const tc of toolCalls) {
     if (tc.status !== 'completed') continue
-    if (tc.kind !== 'edit' && tc.kind !== 'delete' && tc.kind !== 'move') continue
+    if (!isFileMutation(tc.kind, tc.title)) continue
 
     const filePath = tc.locations?.[0]?.path
     if (!filePath) continue
-
-    // Skip files that don't appear in the actual diff (e.g. reverted edits)
-    // Only validate if we have diff data; if diff is empty, trust tool calls
     if (diffPaths.size > 0 && !diffPaths.has(filePath)) continue
 
     let additions = 0
@@ -104,15 +124,17 @@ function extractFileStats(toolCalls: readonly ToolCall[], rawDiff: string): File
 
   const result: FileStats[] = []
   for (const [path, stats] of statsMap) {
-    result.push({ path, name: path.slice(path.lastIndexOf('/') + 1), ...stats })
+    const lastSlash = path.lastIndexOf('/')
+    const name = lastSlash >= 0 ? path.slice(lastSlash + 1) : path
+    const dotIdx = name.lastIndexOf('.')
+    const ext = dotIdx > 0 ? name.slice(dotIdx + 1) : ''
+    result.push({ path, name, ext, ...stats })
   }
   return result
 }
 
-/** Group files by parent directory, sorted alphabetically */
 function groupByDirectory(files: readonly FileStats[]): DirGroup[] {
   const groups = new Map<string, FileStats[]>()
-
   for (const file of files) {
     const lastSlash = file.path.lastIndexOf('/')
     const dir = lastSlash > 0 ? file.path.slice(0, lastSlash) : ''
@@ -120,7 +142,6 @@ function groupByDirectory(files: readonly FileStats[]): DirGroup[] {
     if (!arr) { arr = []; groups.set(dir, arr) }
     arr.push(file)
   }
-
   const result: DirGroup[] = []
   for (const [dir, dirFiles] of groups) {
     dirFiles.sort((a, b) => a.name.localeCompare(b.name))
@@ -132,31 +153,38 @@ function groupByDirectory(files: readonly FileStats[]): DirGroup[] {
   return result
 }
 
-// ── Memoized sub-components ──────────────────────────────────────
+// ── Sub-components ───────────────────────────────────────────────
 
-const StatBadge = memo(function StatBadge({ additions, deletions }: { additions: number; deletions: number }) {
-  if (additions === 0 && deletions === 0) return null
+const Stats = memo(function Stats({ additions, deletions }: { additions: number; deletions: number }) {
   return (
-    <span className="flex items-center gap-1.5 font-mono text-[11px] tabular-nums">
-      {additions > 0 && <span className="text-emerald-400">+{additions}</span>}
-      {deletions > 0 && <span className="text-red-400/80">-{deletions}</span>}
+    <span className="ml-auto shrink-0 font-mono text-[10px] tabular-nums">
+      <span className="text-emerald-400">+{additions}</span>
+      <span className="mx-0.5 text-muted-foreground/70">/</span>
+      <span className="text-red-400/80">-{deletions}</span>
     </span>
   )
 })
 
-const FileEntry = memo(function FileEntry({ file, indented, onClick }: { file: FileStats; indented: boolean; onClick: (path: string) => void }) {
+const FileRow = memo(function FileRow({ file, depth, onClick }: { file: FileStats; depth: number; onClick: (path: string) => void }) {
   return (
     <button
       type="button"
       onClick={() => onClick(file.path)}
-      className={cn(
-        'flex w-full items-center gap-1.5 py-1.5 text-left transition-colors hover:bg-muted/10',
-        indented ? 'pl-9 pr-3.5' : 'px-3.5',
-      )}
+      className="group flex w-full items-center gap-1.5 rounded-md py-1 pr-2 text-left hover:bg-background/80"
+      style={{ paddingLeft: depth * 14 + 8 }}
     >
-      <IconFile className="size-3.5 shrink-0 text-muted-foreground/25" />
-      <span className="flex-1 truncate text-[12px] text-foreground/70">{file.name}</span>
-      <StatBadge additions={file.additions} deletions={file.deletions} />
+      <span aria-hidden className="size-3.5 shrink-0" />
+      <img
+        alt=""
+        aria-hidden
+        className="shrink-0 size-3.5 text-muted-foreground/70"
+        loading="lazy"
+        src={getFileIconUrl(file.ext)}
+      />
+      <span className="truncate font-mono text-[11px] text-muted-foreground/80 group-hover:text-foreground/90">
+        {file.name}
+      </span>
+      <Stats additions={file.additions} deletions={file.deletions} />
     </button>
   )
 })
@@ -164,7 +192,6 @@ const FileEntry = memo(function FileEntry({ file, indented, onClick }: { file: F
 // ── Main component ───────────────────────────────────────────────
 
 export const ChangedFilesSummary = memo(function ChangedFilesSummary({ row }: { row: ChangedFilesRow }) {
-  const [expanded, setExpanded] = useState(false)
   const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(() => new Set())
   const [showAll, setShowAll] = useState(false)
   const rawDiff = useDiffStore((s) => s.diff)
@@ -178,6 +205,8 @@ export const ChangedFilesSummary = memo(function ChangedFilesSummary({ row }: { 
     return { additions, deletions }
   }, [fileStats])
 
+  const allCollapsed = collapsedDirs.size === dirGroups.length && dirGroups.length > 0
+
   const toggleDir = useCallback((dir: string) => {
     setCollapsedDirs((prev) => {
       const next = new Set(prev)
@@ -186,7 +215,7 @@ export const ChangedFilesSummary = memo(function ChangedFilesSummary({ row }: { 
     })
   }, [])
 
-  const collapseAll = useCallback(() => {
+  const toggleAll = useCallback(() => {
     setCollapsedDirs((prev) =>
       prev.size === dirGroups.length
         ? new Set()
@@ -204,93 +233,104 @@ export const ChangedFilesSummary = memo(function ChangedFilesSummary({ row }: { 
 
   if (fileStats.length === 0) return null
 
-  // Cap visible files for performance
   const totalFiles = fileStats.length
   const isCapped = !showAll && totalFiles > MAX_VISIBLE_FILES
+  let visibleCount = 0
 
   return (
-    <div className="my-2 rounded-xl border border-border/20 bg-muted/[0.06] shadow-sm" data-timeline-row-kind="changed-files">
-      {/* ── Header ── */}
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left transition-colors hover:bg-muted/10"
-      >
-        {expanded
-          ? <IconChevronDown className="size-3.5 shrink-0 text-muted-foreground/50" />
-          : <IconChevronRight className="size-3.5 shrink-0 text-muted-foreground/50" />}
-        <IconFileDiff className="size-3.5 shrink-0 text-muted-foreground/40" />
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-          Changed files
-        </span>
-        <span className="text-[11px] text-muted-foreground/30">({totalFiles})</span>
-        <span className="mx-1 text-muted-foreground/15">&middot;</span>
-        <StatBadge additions={totals.additions} deletions={totals.deletions} />
-        <div className="flex-1" />
-        {expanded && dirGroups.length > 1 && (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); collapseAll() }}
-            className="rounded-md px-2 py-0.5 text-[10px] font-medium text-muted-foreground/40 transition-colors hover:bg-muted/20 hover:text-muted-foreground/70"
-          >
-            {collapsedDirs.size === dirGroups.length ? 'Expand all' : 'Collapse all'}
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); handleViewDiff() }}
-          className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium text-muted-foreground/40 transition-colors hover:bg-muted/20 hover:text-muted-foreground/70"
-        >
-          <IconEye className="size-3" />
-          View diff
-        </button>
-      </button>
-
-      {/* ── File list ── */}
-      {expanded && (
-        <div className="border-t border-border/10 py-1">
-          {dirGroups.map((group) => {
-            const isDirCollapsed = collapsedDirs.has(group.dir)
-            // Respect the cap: skip groups that are entirely past the limit
-            const visibleFiles = isCapped
-              ? group.files.slice(0, Math.max(0, MAX_VISIBLE_FILES - dirGroups.indexOf(group) * 5))
-              : group.files
-            if (isCapped && visibleFiles.length === 0) return null
-
-            return (
-              <div key={group.dir || '__root'}>
-                {group.dir && (
-                  <button
-                    type="button"
-                    onClick={() => toggleDir(group.dir)}
-                    className="flex w-full items-center gap-1.5 px-3.5 py-1.5 text-left transition-colors hover:bg-muted/10"
-                  >
-                    {isDirCollapsed
-                      ? <IconChevronRight className="size-3 shrink-0 text-muted-foreground/30" />
-                      : <IconChevronDown className="size-3 shrink-0 text-muted-foreground/30" />}
-                    <IconFolder className="size-3.5 shrink-0 text-muted-foreground/30" />
-                    <span className="flex-1 truncate text-[12px] text-muted-foreground/50">{group.dir}</span>
-                    <StatBadge additions={group.additions} deletions={group.deletions} />
-                  </button>
-                )}
-                {!isDirCollapsed && (isCapped ? visibleFiles : group.files).map((file) => (
-                  <FileEntry key={file.path} file={file} indented={!!group.dir} onClick={handleFileClick} />
-                ))}
-              </div>
-            )
-          })}
-
-          {isCapped && (
+    <div className="mt-2 rounded-lg border border-border/80 bg-card/45 p-2.5" data-timeline-row-kind="changed-files">
+      {/* Header */}
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/65">
+          <span>Changed files ({totalFiles})</span>
+          <span className="mx-1">&middot;</span>
+          <span className="text-emerald-400">+{totals.additions}</span>
+          <span className="mx-0.5 text-muted-foreground/70">/</span>
+          <span className="text-red-400/80">-{totals.deletions}</span>
+        </p>
+        <div className="flex items-center gap-1.5">
+          {dirGroups.length > 1 && (
             <button
               type="button"
-              onClick={() => setShowAll(true)}
-              className="flex w-full justify-center py-2 text-[11px] text-muted-foreground/40 transition-colors hover:text-muted-foreground/70"
+              onClick={toggleAll}
+              className="rounded-md border border-input bg-popover px-2 py-0.5 text-[11px] font-medium text-foreground shadow-xs/5 transition-colors hover:bg-accent/50"
             >
-              Show {totalFiles - MAX_VISIBLE_FILES} more files
+              {allCollapsed ? 'Expand all' : 'Collapse all'}
             </button>
           )}
+          <button
+            type="button"
+            onClick={handleViewDiff}
+            className="rounded-md border border-input bg-popover px-2 py-0.5 text-[11px] font-medium text-foreground shadow-xs/5 transition-colors hover:bg-accent/50"
+          >
+            View diff
+          </button>
         </div>
-      )}
+      </div>
+
+      {/* File tree */}
+      <div className="space-y-0.5">
+        {dirGroups.map((group) => {
+          const isDirCollapsed = collapsedDirs.has(group.dir)
+
+          return (
+            <div key={group.dir || '__root'}>
+              {/* Directory header */}
+              {group.dir && (
+                <button
+                  type="button"
+                  onClick={() => toggleDir(group.dir)}
+                  className="group flex w-full items-center gap-1.5 rounded-md py-1 pr-2 text-left hover:bg-background/80"
+                  style={{ paddingLeft: 8 }}
+                >
+                  <IconChevronRight
+                    className={cn(
+                      'size-3.5 shrink-0 text-muted-foreground/70 transition-transform group-hover:text-foreground/80',
+                      !isDirCollapsed && 'rotate-90',
+                    )}
+                    aria-hidden
+                  />
+                  {isDirCollapsed
+                    ? <IconFolder className="size-3.5 shrink-0 text-muted-foreground/75" aria-hidden />
+                    : <IconFolderOpen className="size-3.5 shrink-0 text-muted-foreground/75" aria-hidden />}
+                  <span className="truncate font-mono text-[11px] text-muted-foreground/90 group-hover:text-foreground/90">
+                    {group.dir}
+                  </span>
+                  <Stats additions={group.additions} deletions={group.deletions} />
+                </button>
+              )}
+
+              {/* Files */}
+              {!isDirCollapsed && (
+                <div className="space-y-0.5">
+                  {group.files.map((file) => {
+                    if (isCapped && visibleCount >= MAX_VISIBLE_FILES) return null
+                    visibleCount++
+                    return (
+                      <FileRow
+                        key={file.path}
+                        file={file}
+                        depth={group.dir ? 1 : 0}
+                        onClick={handleFileClick}
+                      />
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        {isCapped && (
+          <button
+            type="button"
+            onClick={() => setShowAll(true)}
+            className="flex w-full justify-center py-1.5 text-[11px] text-muted-foreground/40 transition-colors hover:text-muted-foreground/70"
+          >
+            Show {totalFiles - MAX_VISIBLE_FILES} more files
+          </button>
+        )}
+      </div>
     </div>
   )
 })

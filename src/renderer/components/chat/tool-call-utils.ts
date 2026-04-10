@@ -19,6 +19,14 @@ const kindIcons: Record<ToolKind, TablerIcon> = {
   other: IconTool,
 }
 
+/** Check if a tool call represents a file mutation (edit, delete, move) */
+export function isFileMutation(kind?: ToolKind, title?: string): boolean {
+  if (kind === 'edit' || kind === 'delete' || kind === 'move') return true
+  if (kind) return false
+  const t = (title ?? '').toLowerCase()
+  return t.includes('edit') || t.includes('write') || t.includes('patch') || t.includes('delet') || t.includes('mov') || t.includes('renam')
+}
+
 export function getToolIcon(kind?: ToolKind, title?: string): TablerIcon {
   if (kind && kindIcons[kind]) return kindIcons[kind]
   const t = (title ?? '').toLowerCase()

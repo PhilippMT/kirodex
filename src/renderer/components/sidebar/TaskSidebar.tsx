@@ -20,11 +20,24 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 
 const SortDropdown = memo(function SortDropdown({ sort, onChange }: { sort: SortKey; onChange: (s: SortKey) => void }) {
   const [open, setOpen] = useState(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+
+  const handleOpen = useCallback(() => {
+    setOpen((v) => {
+      if (!v && btnRef.current) {
+        const r = btnRef.current.getBoundingClientRect()
+        setPos({ top: r.bottom + 4, left: r.left })
+      }
+      return !v
+    })
+  }, [])
+
   return (
     <div className="relative">
       <Tooltip>
         <TooltipTrigger asChild>
-          <button type="button" onClick={() => setOpen((v) => !v)}
+          <button ref={btnRef} type="button" onClick={handleOpen}
             className={cn('inline-flex size-5 cursor-pointer items-center justify-center rounded-md transition-colors',
               open ? 'bg-accent text-foreground' : 'text-muted-foreground/60 hover:bg-accent hover:text-foreground')}>
             <IconArrowsUpDown className="size-3.5" />
@@ -35,7 +48,7 @@ const SortDropdown = memo(function SortDropdown({ sort, onChange }: { sort: Sort
       {open && (
         <>
           <div className="fixed inset-0 z-[199]" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-6 z-[200] min-w-[130px] rounded-lg border border-border bg-popover py-1 shadow-lg">
+          <div className="fixed z-[200] min-w-[130px] rounded-lg border border-border bg-popover py-1 shadow-lg" style={{ top: pos.top, left: pos.left }}>
             {SORT_OPTIONS.map((opt) => (
               <button key={opt.key} type="button"
                 onClick={() => { onChange(opt.key); setOpen(false) }}

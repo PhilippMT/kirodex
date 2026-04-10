@@ -116,6 +116,14 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for code style, project layout, and archi
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines, code style, and project layout.
 
+## Author
+
+Sabeur Thabti
+
+## Sponsor
+
+[Lastline.app](https://lastline.app)
+
 ## License
 
 MIT
