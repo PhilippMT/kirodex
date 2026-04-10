@@ -104,39 +104,42 @@ export const ProjectItem = memo(function ProjectItem({
           )}
         </button>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              aria-label={`New thread in ${name}`}
-              onClick={onNewThread}
-              className={cn(
-                'absolute top-1 right-7 z-10 flex size-5 cursor-pointer items-center justify-center rounded-md text-muted-foreground/70 hover:bg-secondary hover:text-foreground outline-none transition-opacity',
-                hovered ? 'opacity-100' : 'opacity-0',
-              )}
-            >
-              <IconEdit className="size-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right">New thread</TooltipContent>
-        </Tooltip>
+        {/* Floating action buttons with gradient fade */}
+        <div
+          className={cn(
+            'pointer-events-none absolute inset-y-0 right-0 z-10 flex w-16 items-center justify-end gap-0.5 pr-1 transition-opacity',
+            hovered ? 'opacity-100' : 'opacity-0',
+          )}
+          style={{ background: 'linear-gradient(to right, transparent 0%, var(--sidebar-bg, var(--card)) 35%)' }}
+        >
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label={`New thread in ${name}`}
+                onClick={onNewThread}
+                className="pointer-events-auto flex size-5 cursor-pointer items-center justify-center rounded-md text-muted-foreground/70 hover:bg-secondary hover:text-foreground outline-none"
+              >
+                <IconEdit className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">New thread</TooltipContent>
+          </Tooltip>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              aria-label={`Remove ${name}`}
-              onClick={onRemoveProject}
-              className={cn(
-                'absolute top-1 right-1.5 z-10 flex size-5 cursor-pointer items-center justify-center rounded-md text-muted-foreground/70 hover:bg-destructive/15 hover:text-destructive outline-none transition-opacity',
-                hovered ? 'opacity-100' : 'opacity-0',
-              )}
-            >
-              <IconTrash className="size-3" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right">Remove project</TooltipContent>
-        </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label={`Remove ${name}`}
+                onClick={onRemoveProject}
+                className="pointer-events-auto flex size-5 cursor-pointer items-center justify-center rounded-md text-muted-foreground/70 hover:bg-destructive/15 hover:text-destructive outline-none"
+              >
+                <IconTrash className="size-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Remove project</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
       {ctxMenu && (
@@ -167,7 +170,7 @@ export const ProjectItem = memo(function ProjectItem({
       )}
 
       {expanded && tasks.length > 0 && (
-        <ul className="flex min-w-0 flex-col border-l mx-1 my-0 gap-0.5 px-1.5 py-0" style={{ borderColor: 'var(--border)' }}>
+        <ul className="flex min-w-0 flex-col overflow-hidden border-l mx-1 my-0 gap-0.5 px-1.5 py-0" style={{ borderColor: 'var(--border)' }}>
           {tasks.map((task) => (
             <ThreadItem
               key={task.id}

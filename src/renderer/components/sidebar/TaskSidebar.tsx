@@ -115,7 +115,7 @@ export const TaskSidebar = memo(function TaskSidebar({ width, onResize }: TaskSi
   })
 
   return (
-    <div data-testid="task-sidebar" className="relative flex h-full min-h-0 shrink-0 flex-col border-r bg-card pl-1 text-foreground" style={{ width }}>
+    <div data-testid="task-sidebar" className="relative flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r bg-card pl-1 text-foreground" style={{ width }}>
       <div
         role="separator"
         aria-orientation="vertical"
@@ -139,10 +139,10 @@ export const TaskSidebar = memo(function TaskSidebar({ width, onResize }: TaskSi
           </Tooltip>
         </div>
       </div>
-      <ScrollArea className="min-h-0 flex-1 px-2">
-        <div className="pb-2">
-          <div className="relative flex w-full min-w-0 flex-col">
-            <ul className="flex w-full min-w-0 flex-col gap-1">
+      <ScrollArea className="min-h-0 flex-1 overflow-hidden px-2">
+        <div className="min-w-0 pb-2">
+          <div className="relative flex min-w-0 flex-col">
+            <ul className="flex min-w-0 flex-col gap-1">
               {projectList.length === 0 && (
                 <p className="px-3 py-6 text-center text-[11px] text-muted-foreground">No projects yet — click + to import a folder</p>
               )}

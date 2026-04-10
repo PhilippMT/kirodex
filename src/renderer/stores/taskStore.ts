@@ -547,6 +547,17 @@ export function initTaskListeners(): () => void {
     // Persist history after turn ends
     useTaskStore.getState().persistHistory()
 
+    // Send a native notification when the window is not focused
+    if (!document.hasFocus()) {
+      const task = useTaskStore.getState().tasks[taskId]
+      const title = task?.name ?? 'Agent finished'
+      import('@tauri-apps/plugin-notification').then(({ isPermissionGranted, sendNotification }) => {
+        isPermissionGranted().then((ok) => {
+          if (ok) sendNotification({ title: 'Kirodex', body: title })
+        })
+      }).catch(() => {})
+    }
+
     // Auto-send the first queued message if any exist
     const state = useTaskStore.getState()
     const queue = state.queuedMessages[taskId] ?? []

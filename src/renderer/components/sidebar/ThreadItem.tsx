@@ -96,7 +96,7 @@ export const ThreadItem = memo(function ThreadItem({ task, isActive, onSelect, o
         onContextMenu={handleContextMenu}
         onKeyDown={(e) => e.key === 'Enter' && onSelect()}
         className={cn(
-          'flex min-w-0 h-7 w-full cursor-pointer items-center gap-1.5 overflow-hidden rounded-lg px-2 pr-6 text-xs select-none',
+          'flex min-w-0 h-7 w-full cursor-pointer items-center gap-1.5 overflow-hidden rounded-lg px-2 pr-1 text-xs select-none',
           'outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring transition-colors',
           isActive
             ? 'bg-accent/85 dark:bg-accent/55 text-foreground font-medium hover:bg-accent dark:hover:bg-accent/70'
@@ -123,14 +123,21 @@ export const ThreadItem = memo(function ThreadItem({ task, isActive, onSelect, o
           {relativeTime(task.createdAt)}
         </span>
       </div>
-      <button
-        type="button"
-        aria-label="Delete thread"
-        onClick={(e) => { e.stopPropagation(); onDelete() }}
-        className="absolute right-1 top-1/2 z-10 hidden size-5 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-destructive/15 hover:text-destructive group-hover/thread:flex"
+      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden w-14 items-center justify-end rounded-r-lg pr-1 group-hover/thread:flex"
+        style={{ background: isActive
+          ? 'linear-gradient(to right, transparent 0%, hsl(var(--accent) / 0.55) 40%)'
+          : 'linear-gradient(to right, transparent 0%, hsl(var(--accent)) 40%)'
+        }}
       >
-        <IconTrash className="size-3" />
-      </button>
+        <button
+          type="button"
+          aria-label="Delete thread"
+          onClick={(e) => { e.stopPropagation(); onDelete() }}
+          className="pointer-events-auto flex size-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-destructive/15 hover:text-destructive"
+        >
+          <IconTrash className="size-3" />
+        </button>
+      </div>
 
       {ctxMenu && (
         <div

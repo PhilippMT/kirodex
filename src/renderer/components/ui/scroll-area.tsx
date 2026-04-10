@@ -13,8 +13,9 @@ const ScrollArea = forwardRef<
     {...props}
   >
     <ScrollAreaPrimitive.Viewport
-      className="h-full w-full rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+      className="h-full w-full rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background [&>div]:!block"
       data-slot="scroll-area-viewport"
+      style={{ overflowX: 'hidden' }}
     >
       {children}
     </ScrollAreaPrimitive.Viewport>
