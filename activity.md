@@ -1,6 +1,42 @@
 # Activity Log
 
 
+## 2026-04-10 09:12 GST (Dubai, UTC+4)
+
+### Made file mention pills inline within the ChatInput textarea area
+
+Moved `FileMentionPill` rendering from a separate `div` (with its own `px-3 pt-3` padding) above the textarea into the same container `div` that holds the textarea. Pills now render inline just above the textarea text, inside the same padded area, creating a cohesive inline feel instead of a visually separate block.
+
+**Modified:** `src/renderer/components/chat/ChatInput.tsx`
+
+## 2026-04-10 09:10 GST (Dubai, UTC+4)
+
+### Redesigned ChatInput footer bar with visual grouping
+
+The footer toolbar was a flat row of six items separated by identical thin dividers, with no visual hierarchy. Redesigned into three logical groups:
+
+1. Left pill: `ModeToggle` + dot + `ModelPicker` (AI controls, wrapped in a `ToolbarGroup` with `bg-muted/50` background)
+2. Center: `AutoApproveToggle` + `BranchSelector` (standalone controls, no wrapper)
+3. Right: `ContextRing` + `Paperclip` + `Send/Pause` (actions + status)
+
+Other changes:
+- Moved `ContextRing` from floating `absolute right-3 top-2.5` into the footer bar (right group)
+- Replaced thin `Sep` dividers (`w-px bg-border/60`) with pill-shaped `ToolbarGroup` wrapper and small `Dot` separators (`size-[3px] rounded-full bg-border`)
+- Paperclip button now `rounded-full` with `hover:bg-muted/60` for better hit target
+- Updated ghost ChatInput in `App.tsx` to match the new grouped skeleton layout
+
+**Build:** `tsc --noEmit` ✓ | `vite build` ✓ (2.14s)
+
+**Modified files:**
+- `src/renderer/components/chat/ChatInput.tsx`
+- `src/renderer/App.tsx`
+
+## 2026-04-10 09:08 GST (Dubai, UTC+4)
+
+### Removed IDE/tool config folders
+
+Deleted `.trae`, `.gemini`, `.opencode`, and `.kilocode` folders from the project root. These were leftover config directories from other AI coding tools.
+
 
 ## 2026-04-10 01:45 GST (Dubai, UTC+4)
 
