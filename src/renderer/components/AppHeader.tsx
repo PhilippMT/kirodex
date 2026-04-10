@@ -136,39 +136,43 @@ function AppHeaderInner({ sidePanelOpen, onToggleSidePanel, isSidebarCollapsed, 
           <ErrorBoundary fallback={null}>
             <OpenInEditorGroup workspace={workspace} />
           </ErrorBoundary>
-          {task && (
-            <ErrorBoundary fallback={null}>
-              <GitActionsGroup taskId={task.id} workspace={task.workspace} />
-            </ErrorBoundary>
-          )}
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                data-testid="toggle-diff-button"
-                aria-label="Toggle diff panel"
-                aria-pressed={sidePanelOpen}
-                onClick={onToggleSidePanel}
-                className={cn(
-                  'inline-flex h-6 items-center gap-1.5 rounded-md border border-input px-1.5 text-xs shadow-xs/5 transition-colors',
-                  sidePanelOpen ? 'bg-input/64 dark:bg-input text-foreground' : 'bg-popover hover:bg-accent/50 dark:bg-input/32 text-muted-foreground',
-                )}
-              >
-                <IconGitCompare className="size-3" aria-hidden />
-                {hasStats && (
-                  <span className={cn('flex items-center gap-1 tabular-nums', canPause && 'animate-pulse')}>
-                    {diffStats.fileCount > 0 && (
-                      <span className="text-[10px] text-muted-foreground">{diffStats.fileCount}</span>
-                    )}
-                    <span className="text-[10px] font-semibold text-emerald-500">+{diffStats.additions.toLocaleString()}</span>
-                    <span className="text-[10px] font-semibold text-red-500">-{diffStats.deletions.toLocaleString()}</span>
-                  </span>
-                )}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">Files changed</TooltipContent>
-          </Tooltip>
+          {/* Diff stats + git dropdown as one split button */}
+          <div className="flex">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  data-testid="toggle-diff-button"
+                  aria-label="Toggle diff panel"
+                  aria-pressed={sidePanelOpen}
+                  onClick={onToggleSidePanel}
+                  className={cn(
+                    'inline-flex h-6 items-center gap-1.5 px-1.5 text-xs shadow-xs/5 transition-colors border border-input',
+                    task ? 'rounded-l-md' : 'rounded-md',
+                    sidePanelOpen ? 'bg-input/64 dark:bg-input text-foreground' : 'bg-popover hover:bg-accent/50 dark:bg-input/32 text-muted-foreground',
+                  )}
+                >
+                  <IconGitCompare className="size-3" aria-hidden />
+                  {hasStats && (
+                    <span className={cn('flex items-center gap-1 tabular-nums', canPause && 'animate-pulse')}>
+                      {diffStats.fileCount > 0 && (
+                        <span className="text-[10px] text-muted-foreground">{diffStats.fileCount}</span>
+                      )}
+                      <span className="text-[10px] font-semibold text-emerald-500">+{diffStats.additions.toLocaleString()}</span>
+                      <span className="text-[10px] font-semibold text-red-500">-{diffStats.deletions.toLocaleString()}</span>
+                    </span>
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Files changed</TooltipContent>
+            </Tooltip>
+            {task && (
+              <ErrorBoundary fallback={null}>
+                <GitActionsGroup workspace={task.workspace} />
+              </ErrorBoundary>
+            )}
+          </div>
 
           <Tooltip>
             <TooltipTrigger asChild>

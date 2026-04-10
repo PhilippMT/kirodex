@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { IconGitCommit, IconChevronDown, IconArrowUp, IconArrowDown, IconRefresh, IconLoader2 } from '@tabler/icons-react'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ipc } from '@/lib/ipc'
 import { cn } from '@/lib/utils'
 
@@ -12,7 +11,7 @@ const GitHubIcon = () => (
 
 type GitAction = 'push' | 'pull' | 'fetch' | 'commit' | null
 
-export function GitActionsGroup({ taskId, workspace }: { taskId: string; workspace: string }) {
+export function GitActionsGroup({ workspace }: { workspace: string }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [commitMsg, setCommitMsg] = useState('')
   const [showCommitInput, setShowCommitInput] = useState(false)
@@ -20,16 +19,21 @@ export function GitActionsGroup({ taskId, workspace }: { taskId: string; workspa
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!menuOpen) return
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setMenuOpen(false) }
+    if (!menuOpen && !showCommitInput) return
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+        setShowCommitInput(false)
+      }
+    }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
-  }, [menuOpen])
+  }, [menuOpen, showCommitInput])
 
   const handleCommit = async () => {
     if (!commitMsg.trim()) return
     setActiveAction('commit')
-    try { await ipc.gitCommit(taskId, commitMsg.trim()); setCommitMsg(''); setShowCommitInput(false) }
+    try { await ipc.gitCommit(workspace, commitMsg.trim()); setCommitMsg(''); setShowCommitInput(false) }
     catch (e) { alert(e instanceof Error ? e.message : 'Commit failed') }
     finally { setActiveAction(null) }
   }
@@ -61,25 +65,34 @@ export function GitActionsGroup({ taskId, workspace }: { taskId: string; workspa
   const busy = activeAction !== null
 
   return (
-    <div ref={ref} data-testid="git-actions-group" className="relative flex w-fit">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button type="button" onClick={() => setShowCommitInput((v) => !v)} disabled={busy}
-            data-testid="git-commit-button"
-            className="inline-flex h-6 items-center gap-1 rounded-l-md border border-input bg-popover px-1.5 text-xs text-foreground shadow-xs/5 transition-colors hover:bg-accent/50 dark:bg-input/32 disabled:opacity-50">
-            {activeAction === 'commit'
-              ? <IconLoader2 className="size-3.5 animate-spin" aria-hidden />
-              : <IconGitCommit className="size-3.5" aria-hidden />}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom">Git commit</TooltipContent>
-      </Tooltip>
-      <div className="pointer-events-none relative z-[2] w-px bg-input dark:bg-input/32" />
-      <button type="button" aria-label="Git options" data-testid="git-options-button" onClick={() => setMenuOpen((v) => !v)}
-        className="inline-flex h-6 w-6 items-center justify-center rounded-r-md border border-input bg-popover text-foreground shadow-xs/5 transition-colors hover:bg-accent/50 dark:bg-input/32">
-        <IconChevronDown className="size-3.5" aria-hidden />
+    <div ref={ref} data-testid="git-actions-group" className="relative">
+      {/* Chevron — sits flush against the diff stats button on the left */}
+      <button type="button" aria-label="Git options" data-testid="git-options-button"
+        onClick={() => { setMenuOpen((v) => !v); setShowCommitInput(false) }}
+        className="inline-flex h-6 w-5 items-center justify-center rounded-r-md border border-l-0 border-input bg-popover text-muted-foreground shadow-xs/5 transition-colors hover:bg-accent/50 hover:text-foreground dark:bg-input/32">
+        <IconChevronDown className={cn('size-3 transition-transform', menuOpen && 'rotate-180')} aria-hidden />
       </button>
 
+      {/* Dropdown menu */}
+      {menuOpen && (
+        <div className="absolute right-0 top-7 z-[200] min-w-[130px] rounded-lg border border-border bg-popover py-1 shadow-lg">
+          <GitMenuItem icon={IconGitCommit} label="Commit" loading={activeAction === 'commit'} disabled={busy}
+            onClick={() => { setMenuOpen(false); setShowCommitInput(true) }} />
+          <GitMenuItem icon={IconArrowUp} label="Push" loading={activeAction === 'push'} disabled={busy}
+            onClick={() => void runGitAction('push', () => ipc.gitPush(workspace), 'Push')} />
+          <GitMenuItem icon={IconArrowDown} label="Pull" loading={activeAction === 'pull'} disabled={busy}
+            onClick={() => void runGitAction('pull', () => ipc.gitPull(workspace), 'Pull')} />
+          <GitMenuItem icon={IconRefresh} label="Fetch" loading={activeAction === 'fetch'} disabled={busy}
+            onClick={() => void runGitAction('fetch', () => ipc.gitFetch(workspace), 'Fetch')} />
+          <div className="mx-2 my-1 border-t border-border/40" />
+          <button type="button" onClick={() => void handleOpenGitHub()}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent transition-colors">
+            <GitHubIcon /> GitHub
+          </button>
+        </div>
+      )}
+
+      {/* Commit input popover */}
       {showCommitInput && (
         <div className="absolute right-0 top-7 z-[200] w-72 rounded-lg border border-border bg-popover p-3 shadow-lg">
           <p className="mb-2 text-[11px] font-medium text-muted-foreground">Commit message</p>
@@ -95,22 +108,6 @@ export function GitActionsGroup({ taskId, workspace }: { taskId: string; workspa
               {activeAction === 'commit' ? 'Committing…' : 'Commit'}
             </button>
           </div>
-        </div>
-      )}
-
-      {menuOpen && (
-        <div className="absolute right-0 top-7 z-[200] min-w-[120px] rounded-lg border border-border bg-popover py-1 shadow-lg">
-          <GitMenuItem icon={IconArrowUp} label="Push" loading={activeAction === 'push'} disabled={busy}
-            onClick={() => void runGitAction('push', () => ipc.gitPush(taskId), 'Push')} />
-          <GitMenuItem icon={IconArrowDown} label="Pull" loading={activeAction === 'pull'} disabled={busy}
-            onClick={() => void runGitAction('pull', () => ipc.gitPull(taskId), 'Pull')} />
-          <GitMenuItem icon={IconRefresh} label="Fetch" loading={activeAction === 'fetch'} disabled={busy}
-            onClick={() => void runGitAction('fetch', () => ipc.gitFetch(taskId), 'Fetch')} />
-          <div className="mx-2 my-1 border-t border-border/40" />
-          <button type="button" onClick={() => void handleOpenGitHub()}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent transition-colors">
-            <GitHubIcon /> GitHub
-          </button>
         </div>
       )}
     </div>

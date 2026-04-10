@@ -110,12 +110,10 @@ pub fn git_create_branch(cwd: String, branch: String) -> Result<BranchResult, Ap
 
 #[tauri::command]
 pub fn git_commit(
-    state: tauri::State<'_, AcpState>,
     settings_state: tauri::State<'_, SettingsState>,
-    task_id: String,
+    cwd: String,
     message: String,
 ) -> Result<String, AppError> {
-    let cwd = resolve_workspace(&state, &task_id)?;
     let repo = Repository::open(&cwd)?;
     let mut index = repo.index()?;
     index.add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None)?;
@@ -135,8 +133,7 @@ pub fn git_commit(
 }
 
 #[tauri::command]
-pub fn git_push(state: tauri::State<'_, AcpState>, task_id: String) -> Result<String, AppError> {
-    let cwd = resolve_workspace(&state, &task_id)?;
+pub fn git_push(cwd: String) -> Result<String, AppError> {
     let repo = Repository::open(&cwd)?;
     let head = repo.head()?;
     let branch_name = head.shorthand().unwrap_or("main");
@@ -147,15 +144,13 @@ pub fn git_push(state: tauri::State<'_, AcpState>, task_id: String) -> Result<St
 }
 
 #[tauri::command]
-pub fn git_pull(state: tauri::State<'_, AcpState>, task_id: String) -> Result<String, AppError> {
-    let cwd = resolve_workspace(&state, &task_id)?;
+pub fn git_pull(cwd: String) -> Result<String, AppError> {
     let repo = Repository::open(&cwd)?;
     let head = repo.head()?;
     let branch_name = head.shorthand().unwrap_or("main").to_string();
     let mut remote = repo.find_remote("origin")?;
     let fetch_refspec = format!("refs/heads/{branch_name}:refs/remotes/origin/{branch_name}");
     remote.fetch(&[&fetch_refspec], None, None)?;
-    // Fast-forward merge
     let fetch_head = repo.find_reference("FETCH_HEAD")?;
     let fetch_commit = repo.reference_to_annotated_commit(&fetch_head)?;
     let (analysis, _) = repo.merge_analysis(&[&fetch_commit])?;
@@ -174,8 +169,7 @@ pub fn git_pull(state: tauri::State<'_, AcpState>, task_id: String) -> Result<St
 }
 
 #[tauri::command]
-pub fn git_fetch(state: tauri::State<'_, AcpState>, task_id: String) -> Result<String, AppError> {
-    let cwd = resolve_workspace(&state, &task_id)?;
+pub fn git_fetch(cwd: String) -> Result<String, AppError> {
     let repo = Repository::open(&cwd)?;
     let mut remote = repo.find_remote("origin")?;
     remote.fetch::<&str>(&[], None, None)?;

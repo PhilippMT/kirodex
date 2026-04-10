@@ -85,14 +85,14 @@ export const ipc = {
     invoke('open_in_editor', { path, editor }),
   detectEditors: (): Promise<string[]> =>
     invoke('detect_editors'),
-  gitCommit: (taskId: string, message: string): Promise<void> =>
-    invoke('git_commit', { taskId, message }),
-  gitPush: (taskId: string): Promise<void> =>
-    invoke('git_push', { taskId }),
-  gitPull: (taskId: string): Promise<string> =>
-    invoke('git_pull', { taskId }),
-  gitFetch: (taskId: string): Promise<string> =>
-    invoke('git_fetch', { taskId }),
+  gitCommit: (cwd: string, message: string): Promise<void> =>
+    invoke('git_commit', { cwd, message }),
+  gitPush: (cwd: string): Promise<string> =>
+    invoke('git_push', { cwd }),
+  gitPull: (cwd: string): Promise<string> =>
+    invoke('git_pull', { cwd }),
+  gitFetch: (cwd: string): Promise<string> =>
+    invoke('git_fetch', { cwd }),
   gitStage: (taskId: string, filePath: string): Promise<void> =>
     invoke('git_stage', { taskId, filePath }),
   gitRevert: (taskId: string, filePath: string): Promise<void> =>
