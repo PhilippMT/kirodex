@@ -112,6 +112,7 @@ export function useChatInput({ disabled, isRunning, onSendMessage, onPause }: Us
       { name: 'agent', description: 'Switch between agents or list available ones' },
       { name: 'plan', description: 'Start the planning agent to design before building' },
       { name: 'chat', description: 'Switch to chat mode' },
+      { name: 'upload', description: 'Upload images or files' },
     ]
     const names = new Set(backendCommands.map((c) => c.name.replace(/^\/+/, '')))
     return [...backendCommands, ...clientCommands.filter((c) => !names.has(c.name))]

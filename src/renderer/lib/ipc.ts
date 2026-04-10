@@ -79,6 +79,8 @@ export const ipc = {
     invoke('git_diff_file', { taskId, filePath }),
   gitDiffStats: (cwd: string): Promise<{ additions: number; deletions: number; fileCount: number }> =>
     invoke('git_diff_stats', { cwd }),
+  gitRemoteUrl: (cwd: string): Promise<string> =>
+    invoke('git_remote_url', { cwd }),
   openInEditor: (path: string, editor: string): Promise<void> =>
     invoke('open_in_editor', { path, editor }),
   detectEditors: (): Promise<string[]> =>
@@ -87,6 +89,10 @@ export const ipc = {
     invoke('git_commit', { taskId, message }),
   gitPush: (taskId: string): Promise<void> =>
     invoke('git_push', { taskId }),
+  gitPull: (taskId: string): Promise<string> =>
+    invoke('git_pull', { taskId }),
+  gitFetch: (taskId: string): Promise<string> =>
+    invoke('git_fetch', { taskId }),
   gitStage: (taskId: string, filePath: string): Promise<void> =>
     invoke('git_stage', { taskId, filePath }),
   gitRevert: (taskId: string, filePath: string): Promise<void> =>
@@ -111,6 +117,13 @@ export const ipc = {
     invoke('list_project_files', { root, respectGitignore }),
   openUrl: (url: string): Promise<void> =>
     invoke('open_url', { url }),
+  // Auth
+  kiroWhoami: (kiroBin?: string): Promise<{ email?: string | null; accountType?: string; region?: string; startUrl?: string }> =>
+    invoke('kiro_whoami', { kiroBin }),
+  kiroLogout: (kiroBin?: string): Promise<void> =>
+    invoke('kiro_logout', { kiroBin }),
+  openTerminalWithCommand: (command: string): Promise<void> =>
+    invoke('open_terminal_with_command', { command }),
   // Event listeners
   onTaskUpdate: (cb: (task: AgentTask) => void): UnsubscribeFn =>
     tauriListen('task_update', cb),

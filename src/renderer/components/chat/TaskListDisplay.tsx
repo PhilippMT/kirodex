@@ -1,0 +1,82 @@
+import { memo } from 'react'
+import { IconCircleCheck, IconCircle, IconListCheck } from '@tabler/icons-react'
+import type { ToolCall } from '@/types'
+
+interface TaskItem {
+  id: string
+  completed: boolean
+  task_description: string
+}
+
+/** Extract task list from a tool call's rawOutput */
+function extractTasks(rawOutput: unknown): TaskItem[] | null {
+  if (!rawOutput || typeof rawOutput !== 'object') return null
+  const out = rawOutput as Record<string, unknown>
+  // Direct shape: { tasks: [...] }
+  if (Array.isArray(out.tasks)) return out.tasks as TaskItem[]
+  // Nested shape: { items: [{ Json: { tasks: [...] } }] }
+  if (Array.isArray(out.items)) {
+    const first = out.items[0] as Record<string, unknown> | undefined
+    if (first?.Json && typeof first.Json === 'object') {
+      const json = first.Json as Record<string, unknown>
+      if (Array.isArray(json.tasks)) return json.tasks as TaskItem[]
+    }
+  }
+  return null
+}
+
+function extractDescription(rawOutput: unknown): string | null {
+  if (!rawOutput || typeof rawOutput !== 'object') return null
+  const out = rawOutput as Record<string, unknown>
+  if (typeof out.description === 'string' && out.description) return out.description
+  if (Array.isArray(out.items)) {
+    const first = out.items[0] as Record<string, unknown> | undefined
+    if (first?.Json && typeof first.Json === 'object') {
+      const json = first.Json as Record<string, unknown>
+      if (typeof json.description === 'string' && json.description) return json.description
+    }
+  }
+  return null
+}
+
+/** Check if a tool call is a task list operation */
+export function isTaskListToolCall(tc: ToolCall): boolean {
+  if (!tc.rawInput || typeof tc.rawInput !== 'object') return false
+  const input = tc.rawInput as Record<string, unknown>
+  return input.command === 'create' || input.command === 'complete' || input.command === 'add' || input.command === 'list'
+}
+
+export const TaskListDisplay = memo(function TaskListDisplay({ toolCall }: { toolCall: ToolCall }) {
+  const tasks = extractTasks(toolCall.rawOutput)
+  if (!tasks || tasks.length === 0) return null
+
+  const description = extractDescription(toolCall.rawOutput)
+  const completed = tasks.filter((t) => t.completed).length
+
+  return (
+    <div className="my-1 ml-1 rounded-lg border border-border/30 bg-card/30">
+      <div className="flex items-center gap-2 px-3 py-2">
+        <IconListCheck className="size-3.5 shrink-0 text-primary/60" />
+        <span className="flex-1 truncate text-[11px] font-medium text-muted-foreground/70">
+          {description ?? 'Task list'}
+        </span>
+        <span className="text-[10px] tabular-nums text-muted-foreground/40">
+          {completed}/{tasks.length}
+        </span>
+      </div>
+      <div className="border-t border-border/20 px-2 py-1.5">
+        {tasks.map((task) => (
+          <div key={task.id} className="flex items-start gap-2 px-1 py-0.5">
+            {task.completed
+              ? <IconCircleCheck className="mt-0.5 size-3.5 shrink-0 text-emerald-400/70" />
+              : <IconCircle className="mt-0.5 size-3.5 shrink-0 text-muted-foreground/25" />
+            }
+            <span className={`text-[11px] leading-relaxed ${task.completed ? 'text-muted-foreground/40 line-through' : 'text-foreground/70'}`}>
+              {task.task_description}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+})

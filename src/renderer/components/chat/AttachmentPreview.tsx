@@ -157,40 +157,33 @@ const AttachmentPill = memo(function AttachmentPill({
   const isImage = attachment.type === 'image' && attachment.preview
 
   return (
-    <div className="relative">
-      <div
+    <span className="relative inline-flex align-middle">
+      <span
         className={cn(
-          'group inline-flex h-[26px] cursor-pointer items-center gap-1 rounded-md border border-border/50 bg-muted/20 pl-1.5 pr-1 transition-colors hover:bg-muted/30',
-          showPreview && 'border-primary/40 bg-primary/5',
+          'inline-flex h-7 cursor-pointer items-center gap-1 rounded-md px-2 text-[12px] font-medium transition-colors',
+          isImage ? 'bg-muted/30 text-foreground/60' : 'bg-accent/40 text-foreground/60',
+          showPreview && 'ring-1 ring-primary/30',
         )}
         role="listitem"
         aria-label={`${attachment.type}: ${attachment.name}`}
         onClick={handleClick}
       >
         {isImage ? (
-          <img
-            src={attachment.preview}
-            alt={attachment.name}
-            className="size-4 shrink-0 rounded-sm object-cover"
-          />
+          <img src={attachment.preview} alt="" className="size-4 shrink-0 rounded-sm object-cover" />
         ) : (
-          <Icon className="size-3 shrink-0 text-foreground/30" aria-hidden />
+          <Icon className="size-3.5 shrink-0 text-foreground/30" aria-hidden />
         )}
-        <span className="max-w-[140px] truncate text-[11px] text-foreground/70">
-          {attachment.name}
-        </span>
-        <span className="text-[10px] text-foreground/25">
-          {formatSize(attachment.size)}
-        </span>
+        <span className="max-w-[140px] truncate">{attachment.name}</span>
+        <span className="text-[11px] text-foreground/25">{formatSize(attachment.size)}</span>
         <button
           type="button"
           onClick={handleRemove}
           aria-label={`Remove ${attachment.name}`}
-          className="flex size-4 items-center justify-center rounded text-foreground/20 transition-colors hover:bg-foreground/10 hover:text-foreground/50"
+          className="ml-0.5 flex size-4 items-center justify-center rounded text-foreground/20 hover:text-foreground/50"
         >
-          <IconX className="size-2.5" aria-hidden />
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M1 1l6 6M7 1l-6 6" /></svg>
         </button>
-      </div>
+      </span>
 
       {showPreview && (
         <PreviewPopover
@@ -199,6 +192,6 @@ const AttachmentPill = memo(function AttachmentPill({
           onOpenExternal={handleOpenExternal}
         />
       )}
-    </div>
+    </span>
   )
 })

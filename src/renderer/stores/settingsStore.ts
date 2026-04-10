@@ -38,11 +38,16 @@ interface SettingsStore {
   activeWorkspace: string | null
   availableCommands: SlashCommand[]
   liveMcpServers: LiveMcpServer[]
+  kiroAuth: { email: string | null; accountType: string; region?: string; startUrl?: string } | null
+  kiroAuthChecked: boolean
   loadSettings: () => Promise<void>
   saveSettings: (settings: AppSettings) => Promise<void>
   fetchModels: (kiroBin?: string) => Promise<void>
   setActiveWorkspace: (workspace: string | null) => void
   setProjectPref: (workspace: string, patch: Partial<ProjectPrefs>) => void
+  checkAuth: () => Promise<void>
+  logout: () => Promise<void>
+  openLogin: () => void
 }
 
 const defaultSettings: AppSettings = {
@@ -61,6 +66,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   availableModes: [],
   currentModeId: null,
   activeWorkspace: null,
+  kiroAuth: null,
+  kiroAuthChecked: false,
   availableCommands: [],
   liveMcpServers: [],
 
@@ -122,5 +129,69 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       ...(patch.modelId !== undefined ? { currentModelId: patch.modelId } : {}),
     })
     ipc.saveSettings(updated).catch(() => {})
+  },
+
+  checkAuth: async () => {
+    try {
+      const { settings } = get()
+      console.log('[auth] checkAuth called with kiroBin:', settings.kiroBin)
+      const result = await ipc.kiroWhoami(settings.kiroBin)
+      console.log('[auth] whoami result:', JSON.stringify(result))
+      if (result.accountType) {
+        set({
+          kiroAuth: {
+            email: result.email ?? null,
+            accountType: result.accountType,
+            region: result.region,
+            startUrl: result.startUrl,
+          },
+          kiroAuthChecked: true,
+        })
+        console.log('[auth] authenticated:', result.accountType, result.email)
+      } else {
+        console.log('[auth] whoami returned no accountType')
+        set({ kiroAuth: null, kiroAuthChecked: true })
+      }
+    } catch (err) {
+      console.warn('[auth] checkAuth failed:', err)
+      set({ kiroAuth: null, kiroAuthChecked: true })
+    }
+  },
+
+  logout: async () => {
+    try {
+      const { settings } = get()
+      await ipc.kiroLogout(settings.kiroBin)
+    } catch { /* ignore */ }
+    set({ kiroAuth: null })
+  },
+
+  openLogin: async () => {
+    const { settings } = get()
+    console.log('[auth] openLogin called with kiroBin:', settings.kiroBin)
+    // If already logged in, just refresh state instead of opening terminal
+    try {
+      const result = await ipc.kiroWhoami(settings.kiroBin)
+      console.log('[auth] openLogin whoami check:', JSON.stringify(result))
+      if (result.accountType) {
+        set({
+          kiroAuth: {
+            email: result.email ?? null,
+            accountType: result.accountType,
+            region: result.region,
+            startUrl: result.startUrl,
+          },
+          kiroAuthChecked: true,
+        })
+        console.log('[auth] already logged in, skipping terminal')
+        return
+      }
+    } catch (err) {
+      console.log('[auth] openLogin whoami failed (not logged in):', err)
+    }
+    console.log('[auth] opening terminal with:', `${settings.kiroBin} login`)
+    ipc.openTerminalWithCommand(`${settings.kiroBin} login`).catch((err) => {
+      console.error('[auth] openTerminalWithCommand failed:', err)
+    })
   },
 }))

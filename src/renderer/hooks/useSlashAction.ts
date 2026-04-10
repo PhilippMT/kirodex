@@ -67,6 +67,11 @@ export const useSlashAction = (): SlashActionResult => {
         useTaskStore.getState().setSettingsOpen(true)
         setPanel(null)
         return true
+      case 'upload':
+        // Trigger the hidden file input — dispatched as a custom event picked up by ChatInput
+        document.dispatchEvent(new CustomEvent('slash-upload'))
+        setPanel(null)
+        return true
       case 'plan':
         switchMode('kiro_planner', 'Plan')
         setPanel(null)

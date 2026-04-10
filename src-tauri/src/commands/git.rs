@@ -147,6 +147,42 @@ pub fn git_push(state: tauri::State<'_, AcpState>, task_id: String) -> Result<St
 }
 
 #[tauri::command]
+pub fn git_pull(state: tauri::State<'_, AcpState>, task_id: String) -> Result<String, AppError> {
+    let cwd = resolve_workspace(&state, &task_id)?;
+    let repo = Repository::open(&cwd)?;
+    let head = repo.head()?;
+    let branch_name = head.shorthand().unwrap_or("main").to_string();
+    let mut remote = repo.find_remote("origin")?;
+    let fetch_refspec = format!("refs/heads/{branch_name}:refs/remotes/origin/{branch_name}");
+    remote.fetch(&[&fetch_refspec], None, None)?;
+    // Fast-forward merge
+    let fetch_head = repo.find_reference("FETCH_HEAD")?;
+    let fetch_commit = repo.reference_to_annotated_commit(&fetch_head)?;
+    let (analysis, _) = repo.merge_analysis(&[&fetch_commit])?;
+    if analysis.is_fast_forward() {
+        let target = fetch_commit.id();
+        let mut reference = repo.find_reference(&format!("refs/heads/{branch_name}"))?;
+        reference.set_target(target, &format!("pull: fast-forward {branch_name}"))?;
+        repo.set_head(&format!("refs/heads/{branch_name}"))?;
+        repo.checkout_head(Some(git2::build::CheckoutBuilder::new().force()))?;
+        Ok(format!("Pulled {branch_name} (fast-forward)"))
+    } else if analysis.is_up_to_date() {
+        Ok("Already up to date".to_string())
+    } else {
+        Err(AppError::Other("Cannot fast-forward; merge required".to_string()))
+    }
+}
+
+#[tauri::command]
+pub fn git_fetch(state: tauri::State<'_, AcpState>, task_id: String) -> Result<String, AppError> {
+    let cwd = resolve_workspace(&state, &task_id)?;
+    let repo = Repository::open(&cwd)?;
+    let mut remote = repo.find_remote("origin")?;
+    remote.fetch::<&str>(&[], None, None)?;
+    Ok("Fetched origin".to_string())
+}
+
+#[tauri::command]
 pub fn git_stage(
     state: tauri::State<'_, AcpState>,
     task_id: String,
@@ -260,6 +296,21 @@ pub fn git_diff_stats(cwd: String) -> Result<GitDiffStats, AppError> {
 
 /// Get unified diff for a single file (relative path) within a task's workspace.
 /// Returns empty string if the file has no changes.
+#[tauri::command]
+pub fn git_remote_url(cwd: String) -> Result<String, AppError> {
+    let repo = Repository::open(&cwd)?;
+    let remote = repo.find_remote("origin")?;
+    let url = remote.url().unwrap_or("").to_string();
+    // Convert SSH URLs to HTTPS: git@github.com:user/repo.git → https://github.com/user/repo
+    let https = if url.starts_with("git@") {
+        let stripped = url.trim_start_matches("git@");
+        format!("https://{}", stripped.replacen(':', "/", 1).trim_end_matches(".git"))
+    } else {
+        url.trim_end_matches(".git").to_string()
+    };
+    Ok(https)
+}
+
 #[tauri::command]
 pub fn git_diff_file(
     state: tauri::State<'_, AcpState>,

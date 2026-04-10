@@ -1,3 +1,66 @@
+## 2026-04-10 14:47 GST (Dubai)
+
+### GitActionsGroup: Per-action inline loading spinners
+
+Replaced single `busy` boolean with `activeAction` state tracking which git action is running. Each menu item (Push, Pull, Fetch, Commit) shows its own spinning loader icon while active, with a trailing `…` indicator. Other items are disabled but not spinning.
+
+**Modified:** `src/renderer/components/GitActionsGroup.tsx`
+
+## 2026-04-10 14:39 GST (Dubai)
+
+### GitActionsGroup: Add Pull, Fetch, and cleaner GitHub menu
+
+Git dropdown now shows Push, Pull, Fetch (with proper icons), and "GitHub" (shortened from "Open on GitHub"). Added `git_pull` (fast-forward merge) and `git_fetch` Rust commands. Shared `runGitAction` helper reduces duplication.
+
+**Modified:** `src-tauri/src/commands/git.rs`, `src-tauri/src/lib.rs`, `src/renderer/lib/ipc.ts`, `src/renderer/components/GitActionsGroup.tsx`
+
+## 2026-04-10 14:33 GST (Dubai)
+
+### GitActionsGroup: Open on GitHub with branch-aware URL
+
+Added `git_remote_url` Rust command that reads the origin remote URL and converts SSH URLs to HTTPS. "Open on GitHub" now opens the repo root for main/master, or `/tree/{branch}` for feature branches.
+
+**Modified:** `src-tauri/src/commands/git.rs`, `src-tauri/src/lib.rs`, `src/renderer/lib/ipc.ts`, `src/renderer/components/GitActionsGroup.tsx`
+
+## 2026-04-10 14:27 GST (Dubai)
+
+### Rust review: src-tauri/src/lib.rs — 3 improvements
+
+Reviewed `lib.rs` with Rust senior engineer lens. Found 3 issues:
+1. **[HIGH]** Undocumented `unsafe` block + `.unwrap()` on FFI handle (line 29-35) — can crash on startup, missing `// SAFETY:` comment
+2. **[MEDIUM]** Mutex `.lock().unwrap()` in close handler (lines 47, 54) — panics on poisoned mutex during shutdown
+3. **[LOW]** `eprintln!` + `process::exit` (line 109-111) — bypasses structured logging, skips destructors
+
+**No files modified** — review only.
+
+## 2026-04-10 14:11 GST (Dubai)
+
+### KiroConfigPanel: Fix project-local .kiro/agents not appearing
+
+`loadConfig()` was called without a project path, so only global `~/.kiro` agents/skills/steering were loaded. Now passes the active workspace path from `useTaskStore` and reloads whenever the workspace changes.
+
+**Modified:** `src/renderer/components/sidebar/KiroConfigPanel.tsx`
+
+
+## 2026-04-10 14:01 GST (Dubai)
+
+### Cleaned up .agents directory — removed irrelevant content from all 4 AGENT.md files
+
+All four agent configs were templated for a database/storage engine project, not a Tauri desktop app. Cleaned each one:
+
+1. **rust-senior-engineer**: Removed WAL, MVCC, compaction, segment files, fsync, binary formats, wire protocol, SIMD, mmap, arena, SmallVec, bumpalo references. Replaced with Tauri-relevant concerns (IPC commands, subprocess management, git operations, config persistence).
+
+2. **rust-senior-engineer-reviewer**: Removed WAL, MVCC, compaction, segment files, wire protocol, SQL injection, rate limiting review focus. Replaced with Tauri-relevant review concerns (IPC validation, subprocess lifecycle, git2 edge cases, config persistence, path traversal, command injection).
+
+3. **rust-architecture-reviewer**: Removed "subsystem specs" reference. Added Tauri-specific review focus (IPC surface area, state management scoping). Referenced actual project docs (CONTRIBUTING.md, README.md).
+
+4. **react-expert**: Removed entire Next.js section (project uses Vite, not Next.js). Removed fake "Integration with Other Agents" section referencing non-existent agents (typescript-expert, nextjs-expert, test-automator, etc.). Replaced with Vite/Zustand/Radix/Tailwind/Tauri IPC-specific guidance matching the actual tech stack.
+
+**Modified:**
+- `.agents/agents/rust-senior-engineer/AGENT.md`
+- `.agents/agents/rust-senior-engineer-reviewer/AGENT.md`
+- `.agents/agents/rust-architecture-reviewer/AGENT.md`
+- `.agents/agents/react-expert/AGENT.md`
 ## 2026-04-10 13:47 GST (Dubai)
 
 ### Steering: Add activity log rule for Claude and Kiro
@@ -1223,3 +1286,15 @@ Moved `px` padding from the inner content div to the `ScrollArea` wrapper (`px-2
 ### ThreadItem: Add delete icon on hover
 
 Added a trash/bin icon button that appears on hover (`group-hover/thread:flex`) positioned at the right side of each thread row. The relative timestamp hides on hover to make room. Clicking the icon triggers `onDelete`. Styled with destructive hover colors.
+
+## 2026-04-10 14:02 (Dubai)
+
+**Feat: Task list checklist component + collapse tool calls by default**
+
+- Created `TaskListDisplay.tsx` — renders task list tool calls as a visual checklist with progress counter, completed items struck through with green checkmarks
+- Detects task list tool calls by checking `rawInput.command` for create/complete/add/list
+- Extracts tasks from `rawOutput` handling both direct `{tasks}` and nested `{items[0].Json.tasks}` shapes
+- Integrated into `ToolCallEntry.tsx` — task list calls show checklist inline, non-task-list calls show raw input/output as before
+- Changed `ToolCallDisplay.tsx` default `expanded` state to `false` (collapsed by default)
+
+Build: TS ✓, Vite ✓

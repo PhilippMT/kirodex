@@ -10,6 +10,7 @@ import { useTaskStore } from '@/stores/taskStore'
 import { ipc } from '@/lib/ipc'
 import { InlineDiff } from './InlineDiff'
 import { getToolIcon } from './tool-call-utils'
+import { TaskListDisplay, isTaskListToolCall } from './TaskListDisplay'
 
 export const ToolCallEntry = memo(function ToolCallEntry({ toolCall }: { toolCall: ToolCall }) {
   const [expanded, setExpanded] = useState(false)
@@ -19,6 +20,7 @@ export const ToolCallEntry = memo(function ToolCallEntry({ toolCall }: { toolCal
   const isRunning = toolCall.status === 'in_progress'
   const isFailed = toolCall.status === 'failed'
   const isCompleted = toolCall.status === 'completed'
+  const isTaskList = isTaskListToolCall(toolCall)
 
   const firstPath = toolCall.locations?.[0]?.path
   const shortPath = firstPath ? firstPath.split('/').slice(-2).join('/') : null
@@ -95,7 +97,9 @@ export const ToolCallEntry = memo(function ToolCallEntry({ toolCall }: { toolCal
 
       {expanded && hasDiff && <InlineDiff diffText={fileDiff} />}
 
-      {expanded && hasContent && (
+      {isTaskList && <TaskListDisplay toolCall={toolCall} />}
+
+      {expanded && hasContent && !isTaskList && (
         <div className="ml-5 mr-2 mb-1 mt-0.5 rounded-md border border-border/30 bg-background/50 px-2.5 py-2 text-xs space-y-2">
           {toolCall.content?.map((item, i) => (
             <div key={i}>

@@ -1,7 +1,9 @@
 import { memo, useEffect, useRef, useState, useCallback } from 'react'
+import { IconRobot, IconTool } from '@tabler/icons-react'
 import { cn } from '@/lib/utils'
 import { ipc } from '@/lib/ipc'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useKiroStore } from '@/stores/kiroStore'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { ProjectFile } from '@/types'
 
@@ -195,17 +197,31 @@ const searchFiles = (files: ProjectFile[], query: string, limit: number = 50): P
 
 // ── File mention pill (rendered in textarea overlay) ─────────────────
 export const FileMentionPill = memo(function FileMentionPill({ path, onRemove }: { path: string; onRemove?: () => void }) {
-  const name = path.split('/').pop() ?? path
-  const ext = name.includes('.') ? name.split('.').pop() ?? '' : ''
+  const isAgent = path.startsWith('agent:')
+  const isSkill = path.startsWith('skill:')
+  const name = isAgent || isSkill ? path.split(':').slice(1).join(':') : (path.split('/').pop() ?? path)
+  const ext = (!isAgent && !isSkill && name.includes('.')) ? name.split('.').pop() ?? '' : ''
+
+  const icon = isAgent
+    ? <IconRobot className="size-3.5 text-purple-400" />
+    : isSkill
+      ? <IconTool className="size-3.5 text-yellow-400" />
+      : <FileIcon ext={ext} isDir={false} />
+
   return (
-    <span className="inline-flex items-center gap-1 rounded-md bg-accent/80 border border-border/50 px-1.5 py-0.5 text-[12px] font-medium text-foreground/90 align-middle mx-0.5">
-      <FileIcon ext={ext} isDir={false} />
-      <span className="max-w-[180px] truncate">{name}</span>
+    <span className={cn(
+      'inline-flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-medium align-middle',
+      isAgent ? 'bg-purple-500/15 text-purple-300' :
+      isSkill ? 'bg-yellow-500/15 text-yellow-300' :
+      'bg-accent/60 text-foreground/70',
+    )}>
+      {icon}
+      <span className="max-w-[160px] truncate">{name}</span>
       {onRemove && (
         <button
           type="button"
           onClick={onRemove}
-          className="ml-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-sm text-muted-foreground/60 hover:bg-destructive/20 hover:text-destructive"
+          className="ml-0.5 flex size-4 items-center justify-center rounded text-current/40 hover:text-destructive"
         >
           <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
             <path d="M1 1l6 6M7 1l-6 6" />
@@ -233,6 +249,15 @@ export const FileMentionPicker = memo(function FileMentionPicker({
   const [loading, setLoading] = useState(false)
   const filesRef = useRef<ProjectFile[]>([])
   const respectGitignore = useSettingsStore((s) => s.settings.respectGitignore ?? true)
+  const agents = useKiroStore((s) => s.config.agents)
+  const skills = useKiroStore((s) => s.config.skills)
+
+  // Ensure kiro config is loaded
+  useEffect(() => {
+    if (!useKiroStore.getState().loaded) {
+      useKiroStore.getState().loadConfig(workspace ?? undefined)
+    }
+  }, [workspace])
 
   // Load project files once when workspace changes
   useEffect(() => {
@@ -250,8 +275,23 @@ export const FileMentionPicker = memo(function FileMentionPicker({
     return () => { cancelled = true }
   }, [workspace, respectGitignore])
 
+  // Build kiro items filtered by query
+  const q = (query ?? '').replace(/^[@./]+/, '').trim().toLowerCase()
+  const kiroItems: Array<{ type: 'agent' | 'skill'; name: string; description?: string }> = []
+  for (const a of agents) {
+    if (!q || a.name.toLowerCase().includes(q)) {
+      kiroItems.push({ type: 'agent', name: a.name, description: a.description })
+    }
+  }
+  for (const s of skills) {
+    if (!q || s.name.toLowerCase().includes(q)) {
+      kiroItems.push({ type: 'skill', name: s.name })
+    }
+  }
+
   // Update filtered results when query changes
   const filtered = query ? searchFiles(filesRef.current, query) : filesRef.current.slice(0, 50)
+  const totalItems = kiroItems.length + filtered.length
 
   useEffect(() => {
     const el = listRef.current?.children[activeIndex] as HTMLElement | undefined
@@ -262,12 +302,19 @@ export const FileMentionPicker = memo(function FileMentionPicker({
   useEffect(() => {
     const handler = (e: Event) => {
       const idx = (e as CustomEvent).detail?.index ?? 0
-      const file = filtered[idx % filtered.length]
-      if (file) onSelect(file)
+      const normalizedIdx = idx % totalItems
+      if (normalizedIdx < kiroItems.length) {
+        const item = kiroItems[normalizedIdx]
+        const prefix = item.type === 'agent' ? 'agent' : 'skill'
+        onSelect({ path: `${prefix}:${item.name}`, name: item.name, dir: '', isDir: false, ext: '', gitStatus: '', linesAdded: 0, linesDeleted: 0, modifiedAt: 0 })
+      } else {
+        const file = filtered[(normalizedIdx - kiroItems.length) % filtered.length]
+        if (file) onSelect(file)
+      }
     }
     document.addEventListener('file-mention-select', handler)
     return () => document.removeEventListener('file-mention-select', handler)
-  }, [filtered, onSelect])
+  }, [filtered, kiroItems, totalItems, onSelect])
 
   if (loading) {
     return (
@@ -283,7 +330,7 @@ export const FileMentionPicker = memo(function FileMentionPicker({
     )
   }
 
-  if (filtered.length === 0) {
+  if (totalItems === 0) {
     return (
       <div className="absolute bottom-full left-0 right-0 z-[300] mb-2 overflow-hidden rounded-xl border border-border bg-popover shadow-xl">
         <p className="px-3 py-3 text-xs text-muted-foreground/50">No files found</p>
@@ -298,8 +345,41 @@ export const FileMentionPicker = memo(function FileMentionPicker({
       aria-label="File mentions"
     >
       <ul ref={listRef} className="max-h-[280px] overflow-y-auto py-1">
+        {kiroItems.map((item, i) => {
+          const isActive = i === activeIndex % totalItems
+          return (
+            <li
+              key={`${item.type}:${item.name}`}
+              role="option"
+              aria-selected={isActive}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                onSelect({ path: `${item.type}:${item.name}`, name: item.name, dir: '', isDir: false, ext: '', gitStatus: '', linesAdded: 0, linesDeleted: 0, modifiedAt: 0 })
+              }}
+              className={cn(
+                'flex cursor-pointer items-center gap-2.5 px-3 py-1.5 transition-colors',
+                isActive ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+              )}
+            >
+              <span className={cn(
+                'flex h-5 w-5 items-center justify-center rounded text-[9px]',
+                item.type === 'agent' ? 'bg-purple-500/20 text-purple-400' : 'bg-yellow-500/20 text-yellow-400',
+              )}>
+                {item.type === 'agent' ? <IconRobot className="size-3" /> : <IconTool className="size-3" />}
+              </span>
+              <span className="min-w-0 flex-1 flex items-center gap-1.5">
+                <span className="truncate text-[13px] font-medium">{item.name}</span>
+              </span>
+              <span className="shrink-0 text-[10px] text-muted-foreground/30">{item.type}</span>
+            </li>
+          )
+        })}
+        {kiroItems.length > 0 && filtered.length > 0 && (
+          <li className="mx-3 my-1 border-t border-border/20" role="separator" />
+        )}
         {filtered.map((file, i) => {
-          const isActive = i === activeIndex % filtered.length
+          const globalIdx = kiroItems.length + i
+          const isActive = globalIdx === activeIndex % totalItems
           return (
             <li
               key={file.path}

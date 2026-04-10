@@ -373,6 +373,104 @@ pub fn list_project_files(root: String, respect_gitignore: bool) -> Result<Vec<P
     Ok(files)
 }
 
+// ── Kiro CLI authentication ──────────────────────────────────────
+
+#[derive(Serialize, serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct KiroIdentity {
+    pub email: Option<String>,
+    #[serde(default)]
+    pub account_type: Option<String>,
+    #[serde(default)]
+    pub region: Option<String>,
+    #[serde(default)]
+    pub start_url: Option<String>,
+}
+
+#[tauri::command]
+pub fn kiro_whoami(kiro_bin: Option<String>) -> Result<KiroIdentity, AppError> {
+    let bin = kiro_bin.unwrap_or_else(|| "kiro-cli".to_string());
+    log::info!("[auth] kiro_whoami called with bin: {}", bin);
+    let output = std::process::Command::new(&bin)
+        .args(["whoami", "--format", "json"])
+        .output()
+        .map_err(|e| {
+            log::error!("[auth] Failed to spawn {}: {}", bin, e);
+            AppError::Other(format!("Failed to run {}: {}", bin, e))
+        })?;
+    log::info!("[auth] whoami exit code: {}", output.status);
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        log::warn!("[auth] whoami failed: {}", stderr.trim());
+        return Err(AppError::Other(format!("Not authenticated: {}", stderr.trim())));
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    log::info!("[auth] whoami stdout: {}", stdout.trim());
+    // kiro-cli whoami --format json outputs JSON on the first line, then extra profile info on subsequent lines
+    let json_line = stdout.lines().next().unwrap_or("{}");
+    log::info!("[auth] parsing JSON line: {}", json_line);
+    let identity: KiroIdentity = serde_json::from_str(json_line)
+        .map_err(|e| {
+            log::error!("[auth] Failed to parse whoami JSON: {} — raw: {}", e, json_line);
+            AppError::Other(format!("Failed to parse whoami output: {}", e))
+        })?;
+    log::info!("[auth] parsed identity: {:?}", identity);
+    Ok(identity)
+}
+
+#[tauri::command]
+pub fn kiro_logout(kiro_bin: Option<String>) -> Result<(), AppError> {
+    let bin = kiro_bin.unwrap_or_else(|| "kiro-cli".to_string());
+    let output = std::process::Command::new(&bin)
+        .arg("logout")
+        .output()
+        .map_err(|e| AppError::Other(format!("Failed to run {} logout: {}", bin, e)))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(AppError::Other(format!("Logout failed: {}", stderr.trim())));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_terminal_with_command(command: String) -> Result<(), AppError> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("osascript")
+            .arg("-e")
+            .arg(format!(
+                "tell application \"Terminal\"\nactivate\ndo script \"{}\"\nend tell",
+                command.replace('\\', "\\\\").replace('"', "\\\"")
+            ))
+            .spawn()
+            .map_err(|e| AppError::Other(format!("Failed to open Terminal: {}", e)))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let terminals = ["gnome-terminal", "konsole", "xfce4-terminal", "xterm"];
+        let mut launched = false;
+        for term in terminals {
+            let result = if term == "gnome-terminal" {
+                std::process::Command::new(term).arg("--").arg("sh").arg("-c").arg(&command).spawn()
+            } else {
+                std::process::Command::new(term).arg("-e").arg(&command).spawn()
+            };
+            if result.is_ok() { launched = true; break; }
+        }
+        if !launched {
+            return Err(AppError::Other("No terminal emulator found".to_string()));
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/c", "start", "cmd", "/k", &command])
+            .spawn()
+            .map_err(|e| AppError::Other(format!("Failed to open terminal: {}", e)))?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,5 +1,5 @@
 import { memo, useState, useRef, useCallback, useMemo, type ReactNode } from 'react'
-import { IconCopy, IconCheck, IconPhoto, IconFileText, IconFile } from '@tabler/icons-react'
+import { IconCopy, IconCheck, IconPhoto, IconFileText, IconFile, IconRobot, IconTool } from '@tabler/icons-react'
 import {
   Tooltip,
   TooltipContent,
@@ -9,28 +9,41 @@ import { CollapsedAnswers } from './CollapsedAnswers'
 import { useDiffStore } from '@/stores/diffStore'
 import type { UserMessageRow as UserMessageRowData } from '@/lib/timeline'
 
-/** Match @-prefixed file paths like @src/foo/Bar.tsx */
-const FILE_MENTION_RE = /@((?:\.{0,2}[\\/])?(?:[\w.@-]+[\\/])*[\w.@-]+\.\w{1,10})/g
+/** Match all @mentions: @agent:name, @skill:name, @file/paths */
+const MENTION_RE = /@(agent:[\w.-]+|skill:[\w.-]+|(?:\.{0,2}[\\/])?(?:[\w.@-]+[\\/])*[\w.@-]+\.\w{1,10})/g
 
-/** Split text into plain strings and file-mention pill elements */
-function renderWithFileMentions(text: string): ReactNode {
+/** Render text with inline mention pills */
+function renderWithMentions(text: string): ReactNode {
   const parts: ReactNode[] = []
   let last = 0
-  for (const m of text.matchAll(FILE_MENTION_RE)) {
+  for (const m of text.matchAll(MENTION_RE)) {
     const idx = m.index!
     if (idx > last) parts.push(text.slice(last, idx))
-    const filePath = m[1]
-    parts.push(
-      <button
-        key={idx}
-        type="button"
-        onClick={() => useDiffStore.getState().openToFile(filePath)}
-        className="mx-0.5 inline-flex items-center gap-1 rounded-md bg-accent/50 px-1.5 py-0.5 align-baseline font-mono text-[12px] text-primary transition-colors hover:bg-accent hover:text-foreground cursor-pointer"
-      >
-        <IconFileText className="size-3 shrink-0" />
-        {filePath}
-      </button>
-    )
+    const ref = m[1]
+    if (ref.startsWith('agent:')) {
+      const name = ref.slice(6)
+      parts.push(
+        <span key={idx} className="mx-0.5 inline-flex items-center gap-0.5 rounded bg-purple-500/15 px-1 py-px align-middle text-[11px] font-medium leading-normal text-purple-400">
+          <IconRobot className="size-2.5 shrink-0" />{name}
+        </span>
+      )
+    } else if (ref.startsWith('skill:')) {
+      const name = ref.slice(6)
+      parts.push(
+        <span key={idx} className="mx-0.5 inline-flex items-center gap-0.5 rounded bg-yellow-500/15 px-1 py-px align-middle text-[11px] font-medium leading-normal text-yellow-400">
+          <IconTool className="size-2.5 shrink-0" />{name}
+        </span>
+      )
+    } else {
+      parts.push(
+        <button key={idx} type="button"
+          onClick={() => useDiffStore.getState().openToFile(ref)}
+          className="mx-0.5 inline-flex items-center gap-0.5 rounded bg-accent/40 px-1 py-px align-middle font-mono text-[11px] leading-normal text-foreground/60 transition-colors hover:bg-accent hover:text-foreground cursor-pointer"
+        >
+          <IconFileText className="size-2.5 shrink-0" />{ref.split('/').pop()}
+        </button>
+      )
+    }
     last = idx + m[0].length
   }
   if (last === 0) return text
@@ -114,7 +127,7 @@ export const UserMessageRow = memo(function UserMessageRow({ row }: { row: UserM
               <div className="space-y-2">
                 {cleanText && (
                   <p className="whitespace-pre-wrap break-words leading-[1.6] text-foreground">
-                    {renderWithFileMentions(cleanText)}
+                    {renderWithMentions(cleanText)}
                   </p>
                 )}
                 {parsedAttachments.length > 0 && (

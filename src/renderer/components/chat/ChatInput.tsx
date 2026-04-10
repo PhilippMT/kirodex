@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useEffect } from 'react'
 import { IconPaperclip, IconClipboard, IconX } from '@tabler/icons-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
@@ -49,6 +49,14 @@ export const ChatInput = memo(function ChatInput({ disabled, contextUsage, messa
   } = useChatInput({ disabled, isRunning, onSendMessage, onPause })
 
   const currentModeId = useSettingsStore((s) => s.currentModeId)
+
+  // Listen for /upload slash command
+  useEffect(() => {
+    const h = () => fileInputRef.current?.click()
+    document.addEventListener('slash-upload', h)
+    return () => document.removeEventListener('slash-upload', h)
+  }, [fileInputRef])
+
   const isPlanMode = currentModeId === 'kiro_planner'
   const borderFocus = isPlanMode ? 'focus-within:border-teal-500/60' : 'focus-within:border-violet-500/60'
   const borderIdle = isPlanMode ? 'border-teal-500/25' : 'border-border'
@@ -96,8 +104,9 @@ export const ChatInput = memo(function ChatInput({ disabled, contextUsage, messa
               />
             )}
             {panel && <SlashActionPanel panel={panel} onDismiss={dismissPanel} />}
-            {(mentionedFiles.length > 0 || pastedChunks.length > 0 || attachments.length > 0) && (
-              <div className="flex flex-wrap items-center gap-1 mb-1.5">
+            {/* Pills row — mentions, attachments, pasted text */}
+            {(mentionedFiles.length > 0 || attachments.length > 0 || pastedChunks.length > 0) && (
+              <div className="flex flex-wrap items-center gap-1 mb-1">
                 {mentionedFiles.map((f) => (
                   <FileMentionPill key={f.path} path={f.path} onRemove={() => handleRemoveMention(f.path)} />
                 ))}
@@ -108,20 +117,18 @@ export const ChatInput = memo(function ChatInput({ disabled, contextUsage, messa
                   <span
                     key={chunk.id}
                     data-testid="pasted-chunk-pill"
-                    className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground"
+                    className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-medium align-middle bg-muted/40 text-foreground/60"
                   >
-                    <IconClipboard className="size-3 shrink-0 text-muted-foreground/50" aria-hidden />
-                    <span>Pasted text #{chunk.id}</span>
-                    <span className="text-muted-foreground/40">
-                      +{chunk.lines > 1 ? `${chunk.lines} lines` : `${chunk.chars} chars`}
-                    </span>
+                    <IconClipboard className="size-3.5 shrink-0 text-foreground/30" aria-hidden />
+                    <span className="max-w-[120px] truncate">Pasted #{chunk.id}</span>
+                    <span className="text-foreground/25">+{chunk.lines > 1 ? `${chunk.lines}L` : `${chunk.chars}c`}</span>
                     <button
                       type="button"
                       onClick={() => handleRemoveChunk(chunk.id)}
                       aria-label={`Remove pasted text #${chunk.id}`}
-                      className="ml-0.5 rounded p-0.5 text-muted-foreground/40 transition-colors hover:bg-accent hover:text-foreground"
+                      className="ml-0.5 flex size-4 items-center justify-center rounded text-foreground/25 hover:text-foreground/50"
                     >
-                      <IconX className="size-2.5" aria-hidden />
+                      <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M1 1l6 6M7 1l-6 6" /></svg>
                     </button>
                   </span>
                 ))}

@@ -11,6 +11,7 @@ import {
   IconBrandPhp,
 } from '@tabler/icons-react'
 import { useKiroStore } from '@/stores/kiroStore'
+import { useTaskStore } from '@/stores/taskStore'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import type { KiroAgent, KiroSkill, KiroSteeringRule, KiroMcpServer } from '@/types'
@@ -318,6 +319,10 @@ export const KiroConfigPanel = memo(function KiroConfigPanel({
   const loading = useKiroStore((s) => s.loading)
   const loaded = useKiroStore((s) => s.loaded)
   const loadConfig = useKiroStore((s) => s.loadConfig)
+  const activeWorkspace = useTaskStore((s) => {
+    const id = s.selectedTaskId
+    return id ? s.tasks[id]?.workspace : s.pendingWorkspace
+  }) ?? null
 
   const [agentsOpen, setAgentsOpen] = useState(false)
   const [skillsOpen, setSkillsOpen] = useState(false)
@@ -327,7 +332,7 @@ export const KiroConfigPanel = memo(function KiroConfigPanel({
   const [search, setSearch] = useState('')
   const [viewer, setViewer] = useState<ViewerState | null>(null)
 
-  useEffect(() => { if (!loaded && !loading) void loadConfig() }, [loaded, loading, loadConfig])
+  useEffect(() => { void loadConfig(activeWorkspace ?? undefined) }, [loadConfig, activeWorkspace])
 
   const lowerSearch = search.toLowerCase()
 

@@ -196,6 +196,7 @@ export function App() {
   useEffect(() => {
     useTaskStore.getState().loadTasks();
     useSettingsStore.getState().loadSettings();
+    useSettingsStore.getState().checkAuth();
     // Pre-warm ACP to get models/modes before user creates a thread
     ipc.probeCapabilities().catch(() => {});
     const cleanupTask = initTaskListeners();

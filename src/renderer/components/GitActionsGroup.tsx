@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react'
-import { IconGitCommit, IconChevronDown } from '@tabler/icons-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { IconGitCommit, IconChevronDown, IconArrowUp, IconArrowDown, IconRefresh, IconLoader2 } from '@tabler/icons-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ipc } from '@/lib/ipc'
+import { cn } from '@/lib/utils'
 
 const GitHubIcon = () => (
   <svg aria-hidden className="size-3.5" viewBox="0 0 24 24" fill="currentColor">
@@ -9,11 +10,13 @@ const GitHubIcon = () => (
   </svg>
 )
 
+type GitAction = 'push' | 'pull' | 'fetch' | 'commit' | null
+
 export function GitActionsGroup({ taskId, workspace }: { taskId: string; workspace: string }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [commitMsg, setCommitMsg] = useState('')
   const [showCommitInput, setShowCommitInput] = useState(false)
-  const [busy, setBusy] = useState(false)
+  const [activeAction, setActiveAction] = useState<GitAction>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -25,18 +28,37 @@ export function GitActionsGroup({ taskId, workspace }: { taskId: string; workspa
 
   const handleCommit = async () => {
     if (!commitMsg.trim()) return
-    setBusy(true)
+    setActiveAction('commit')
     try { await ipc.gitCommit(taskId, commitMsg.trim()); setCommitMsg(''); setShowCommitInput(false) }
     catch (e) { alert(e instanceof Error ? e.message : 'Commit failed') }
-    finally { setBusy(false) }
+    finally { setActiveAction(null) }
   }
 
-  const handlePush = async () => {
-    setBusy(true)
-    try { await ipc.gitPush(taskId) }
-    catch (e) { alert(e instanceof Error ? e.message : 'Push failed') }
-    finally { setBusy(false); setMenuOpen(false) }
-  }
+  const runGitAction = useCallback(async (key: GitAction, action: () => Promise<unknown>, label: string) => {
+    setActiveAction(key)
+    try { await action() }
+    catch (e) { alert(e instanceof Error ? e.message : `${label} failed`) }
+    finally { setActiveAction(null) }
+  }, [])
+
+  const handleOpenGitHub = useCallback(async () => {
+    setMenuOpen(false)
+    try {
+      const [remoteUrl, branches] = await Promise.all([
+        ipc.gitRemoteUrl(workspace),
+        ipc.gitListBranches(workspace),
+      ])
+      if (!remoteUrl) return
+      const branch = branches.currentBranch
+      const isDefault = !branch || branch === 'main' || branch === 'master'
+      ipc.openUrl(isDefault ? remoteUrl : `${remoteUrl}/tree/${branch}`)
+    } catch {
+      try { const url = await ipc.gitRemoteUrl(workspace); if (url) ipc.openUrl(url) }
+      catch { /* no remote */ }
+    }
+  }, [workspace])
+
+  const busy = activeAction !== null
 
   return (
     <div ref={ref} data-testid="git-actions-group" className="relative flex w-fit">
@@ -45,7 +67,9 @@ export function GitActionsGroup({ taskId, workspace }: { taskId: string; workspa
           <button type="button" onClick={() => setShowCommitInput((v) => !v)} disabled={busy}
             data-testid="git-commit-button"
             className="inline-flex h-6 items-center gap-1 rounded-l-md border border-input bg-popover px-1.5 text-xs text-foreground shadow-xs/5 transition-colors hover:bg-accent/50 dark:bg-input/32 disabled:opacity-50">
-            <IconGitCommit className="size-3.5" aria-hidden />
+            {activeAction === 'commit'
+              ? <IconLoader2 className="size-3.5 animate-spin" aria-hidden />
+              : <IconGitCommit className="size-3.5" aria-hidden />}
           </button>
         </TooltipTrigger>
         <TooltipContent side="bottom">Git commit</TooltipContent>
@@ -68,24 +92,49 @@ export function GitActionsGroup({ taskId, workspace }: { taskId: string; workspa
               className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent">Cancel</button>
             <button type="button" onClick={() => void handleCommit()} disabled={!commitMsg.trim() || busy}
               className="rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-              {busy ? 'Committing...' : 'Commit'}
+              {activeAction === 'commit' ? 'Committing…' : 'Commit'}
             </button>
           </div>
         </div>
       )}
 
       {menuOpen && (
-        <div className="absolute right-0 top-7 z-[200] min-w-[140px] rounded-lg border border-border bg-popover py-1 shadow-lg">
-          <button type="button" onClick={() => void handlePush()} disabled={busy}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent transition-colors disabled:opacity-50">
-            <IconGitCommit className="size-3.5" /> Push
-          </button>
-          <button type="button" onClick={() => setMenuOpen(false)}
+        <div className="absolute right-0 top-7 z-[200] min-w-[120px] rounded-lg border border-border bg-popover py-1 shadow-lg">
+          <GitMenuItem icon={IconArrowUp} label="Push" loading={activeAction === 'push'} disabled={busy}
+            onClick={() => void runGitAction('push', () => ipc.gitPush(taskId), 'Push')} />
+          <GitMenuItem icon={IconArrowDown} label="Pull" loading={activeAction === 'pull'} disabled={busy}
+            onClick={() => void runGitAction('pull', () => ipc.gitPull(taskId), 'Pull')} />
+          <GitMenuItem icon={IconRefresh} label="Fetch" loading={activeAction === 'fetch'} disabled={busy}
+            onClick={() => void runGitAction('fetch', () => ipc.gitFetch(taskId), 'Fetch')} />
+          <div className="mx-2 my-1 border-t border-border/40" />
+          <button type="button" onClick={() => void handleOpenGitHub()}
             className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent transition-colors">
-            <GitHubIcon /> Open on GitHub
+            <GitHubIcon /> GitHub
           </button>
         </div>
       )}
     </div>
+  )
+}
+
+function GitMenuItem({ icon: Icon, label, loading, disabled, onClick }: {
+  icon: typeof IconArrowUp
+  label: string
+  loading: boolean
+  disabled: boolean
+  onClick: () => void
+}) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled}
+      className={cn(
+        'flex w-full items-center gap-2 px-3 py-1.5 text-xs transition-colors disabled:opacity-50',
+        loading ? 'text-primary' : 'text-foreground hover:bg-accent',
+      )}>
+      {loading
+        ? <IconLoader2 className="size-3.5 animate-spin" />
+        : <Icon className="size-3.5" />}
+      {label}
+      {loading && <span className="ml-auto text-[10px] text-muted-foreground/50">…</span>}
+    </button>
   )
 }
