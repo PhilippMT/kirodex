@@ -1,14 +1,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-%3E%3D1.78-orange.svg)](https://rustup.rs)
-[![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey.svg)]()
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)]()
 
 <img src="src-tauri/icons/icon.png" alt="Kirodex" height="80" width="80"/>
 
 # Kirodex
 
-A native macOS desktop client for [Kiro CLI](https://kiro.dev) AI coding agents, built with [Tauri v2](https://v2.tauri.app) (Rust) and React 19 (TypeScript).
-
-Inspired by [OpenAI Codex](https://openai.com/codex/) and [T3 Code](https://github.com/pingdotgg/t3code).
+A native desktop client for [Kiro CLI](https://kiro.dev) AI coding agents, built with [Tauri v2](https://v2.tauri.app) (Rust) and React 19 (TypeScript). Inspired by [OpenAI Codex](https://github.com/openai/codex) and [T3 Code](https://github.com/pingdotgg/t3code).
 
 ![Kirodex screenshot](assets/chat-mode-task-progress.png)
 
