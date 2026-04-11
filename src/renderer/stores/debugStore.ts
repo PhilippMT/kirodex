@@ -10,6 +10,8 @@ interface DebugStore {
     search: string
     category: DebugCategory | 'all'
     errorsOnly: boolean
+    threadName: string
+    projectName: string
   }
   addEntry: (entry: DebugLogEntry) => void
   clear: () => void
@@ -42,6 +44,8 @@ export const useDebugStore = create<DebugStore>((set) => ({
     search: '',
     category: 'all',
     errorsOnly: false,
+    threadName: '',
+    projectName: '',
   },
 
   addEntry: (raw) => {

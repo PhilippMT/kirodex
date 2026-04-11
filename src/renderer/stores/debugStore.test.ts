@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { useDebugStore } from './debugStore'
 
 beforeEach(() => {
-  useDebugStore.setState({ entries: [], isOpen: false, filter: { search: '', category: 'all', errorsOnly: false } })
+  useDebugStore.setState({ entries: [], isOpen: false, filter: { search: '', category: 'all', errorsOnly: false, threadName: '', projectName: '' } })
 })
 
 describe('debugStore', () => {
