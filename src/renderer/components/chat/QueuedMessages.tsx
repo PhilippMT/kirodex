@@ -16,7 +16,7 @@ export const QueuedMessages = memo(function QueuedMessages({ messages, onRemove,
   const canReorder = messages.length >= 2 && !!onReorder
 
   return (
-    <div className="mx-auto w-full max-w-2xl lg:max-w-3xl xl:max-w-4xl px-4 sm:px-6">
+    <div className="mx-auto w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl px-4 sm:px-6">
       <div className="flex flex-col gap-1 pb-2">
         <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">
           Queued ({messages.length})

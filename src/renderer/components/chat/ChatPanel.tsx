@@ -192,7 +192,7 @@ export const ChatPanel = memo(function ChatPanel() {
 
         {isArchived ? (
           <div className="px-4 pb-4 pt-2 sm:px-6">
-            <div className="mx-auto w-full max-w-2xl lg:max-w-3xl xl:max-w-4xl">
+            <div className="mx-auto w-full max-w-3xl lg:max-w-4xl xl:max-w-5xl">
               <div className="flex items-center justify-center rounded-2xl border border-border/40 bg-card/50 px-4 py-3 opacity-50">
                 <span className="text-[13px] text-muted-foreground/50">This conversation is from a previous session</span>
               </div>

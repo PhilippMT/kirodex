@@ -70,7 +70,7 @@ export const ChatInput = memo(function ChatInput({ disabled, contextUsage, messa
 
   return (
     <div data-testid="chat-input" className="px-4 pt-1.5 pb-3 mb-[20px] sm:px-6 sm:pt-2 sm:pb-4">
-      <div className="mx-auto w-full min-w-0 max-w-2xl lg:max-w-3xl xl:max-w-4xl">
+      <div className="mx-auto w-full min-w-0 max-w-3xl lg:max-w-4xl xl:max-w-5xl">
         <div className={cn(
           'relative rounded-[20px] border bg-card transition-colors duration-200',
           borderIdle, borderFocus,

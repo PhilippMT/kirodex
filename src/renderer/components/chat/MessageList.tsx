@@ -47,11 +47,18 @@ export const MessageList = memo(function MessageList({
     [messages, streamingChunk, liveToolCalls, liveThinking, isRunning],
   )
 
+  // Stable identity key that changes when the row list changes structurally
+  // (not just content). Used to trigger virtualizer remeasure and auto-scroll.
+  const rowFingerprint = useMemo(
+    () => timelineRows.map((r) => r.id).join(','),
+    [timelineRows],
+  )
+
   const virtualizer = useVirtualizer({
     count: timelineRows.length,
     getScrollElement: () => parentRef.current,
     estimateSize: (index) => ROW_ESTIMATES[timelineRows[index]?.kind ?? 'assistant-text'],
-    overscan: 5,
+    overscan: 8,
     getItemKey: (index) => timelineRows[index]?.id ?? index,
   })
 
@@ -73,11 +80,18 @@ export const MessageList = memo(function MessageList({
     return () => el.removeEventListener('scroll', onScroll)
   }, [])
 
+  // Force virtualizer to recalculate when rows change structurally.
+  // Without this, stale cached measurements from previous rows cause
+  // content to appear missing until the user scrolls.
+  useEffect(() => {
+    virtualizer.measure()
+  }, [rowFingerprint, virtualizer])
+
   useEffect(() => {
     if (isNearBottomRef.current) {
       requestAnimationFrame(scrollToBottom)
     }
-  }, [timelineRows.length, streamingChunk, liveToolCalls, liveThinking, scrollToBottom])
+  }, [rowFingerprint, streamingChunk, liveToolCalls, liveThinking, scrollToBottom])
 
   if (!timelineRows.length) {
     return (
@@ -104,7 +118,7 @@ export const MessageList = memo(function MessageList({
               className="absolute left-0 top-0 w-full"
               style={{ transform: `translateY(${virtualRow.start}px)` }}
             >
-              <div className="mx-auto w-full min-w-0 max-w-2xl overflow-x-hidden px-4 sm:px-6 lg:max-w-3xl xl:max-w-4xl">
+              <div className="mx-auto w-full min-w-0 max-w-3xl overflow-x-hidden px-4 sm:px-6 lg:max-w-4xl xl:max-w-5xl">
                 <TimelineRowRenderer row={row} />
               </div>
             </div>
