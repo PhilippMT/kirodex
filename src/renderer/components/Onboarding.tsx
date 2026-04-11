@@ -20,7 +20,7 @@ export function Onboarding() {
   const [detectState, setDetectState] = useState<DetectState>('detecting')
   const [cliPath, setCliPath] = useState('')
   const [manualPath, setManualPath] = useState('')
-  const [authState, setAuthState] = useState<AuthState>('checking')
+  const [authState, setAuthState] = useState<AuthState>('not-authenticated')
   const [authEmail, setAuthEmail] = useState('')
   const [authAccountType, setAuthAccountType] = useState('')
   const [authRegion, setAuthRegion] = useState('')
@@ -48,7 +48,6 @@ export function Onboarding() {
   }, [step])
 
   const checkAuth = useCallback(async () => {
-    setAuthState('checking')
     try {
       const identity = await ipc.kiroWhoami(bin)
       if (identity.accountType) {
