@@ -11,6 +11,7 @@ import { useKiroStore } from "@/stores/kiroStore";
 import ChatMarkdown from "./ChatMarkdown";
 import { ToolCallDisplay } from "./ToolCallDisplay";
 import { ThinkingDisplay } from "./ThinkingDisplay";
+import { TaskCompletionCard, parseReport, stripReport } from "./TaskCompletionCard";
 
 const LOADING_WORDS = [
   "Thinking",
@@ -201,6 +202,9 @@ export const MessageItem = memo(function MessageItem({
       ? liveToolCalls
       : undefined;
 
+  const report = !streaming ? parseReport(message.content) : null;
+  const displayContent = report ? stripReport(message.content) : message.content;
+
   return (
     <div
       className="pb-4"
@@ -216,13 +220,15 @@ export const MessageItem = memo(function MessageItem({
         <ToolCallDisplay toolCalls={toolCalls} />
       )}
 
-      {message.content ? (
-        <ChatMarkdown text={message.content} isStreaming={streaming} />
+      {displayContent ? (
+        <ChatMarkdown text={displayContent} isStreaming={streaming} />
       ) : streaming ? (
         !thinkingText && (!toolCalls || toolCalls.length === 0) ? (
           <GeneratingIndicator />
         ) : null
       ) : null}
+
+      {report && <TaskCompletionCard report={report} />}
     </div>
   );
 });

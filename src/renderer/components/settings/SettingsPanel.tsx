@@ -455,6 +455,12 @@ export function SettingsPanel() {
                       label="Co-authored-by Kirodex"
                       description="Append a Co-authored-by trailer to every commit"
                     />
+                    <Toggle
+                      checked={draft.coAuthorJsonReport ?? false}
+                      onChange={() => setDraft({ ...draft, coAuthorJsonReport: !(draft.coAuthorJsonReport ?? false) })}
+                      label="Task completion report"
+                      description="Agent returns a JSON summary card when a task finishes"
+                    />
                   </Card>
 
                   <SectionTitle icon={IconHistory} title="Data" description="Manage stored conversation history" />

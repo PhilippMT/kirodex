@@ -41,6 +41,8 @@ pub struct AppSettings {
     pub respect_gitignore: bool,
     #[serde(default = "default_true")]
     pub co_author: bool,
+    #[serde(default)]
+    pub co_author_json_report: bool,
     #[serde(default = "default_true")]
     pub notifications: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -63,6 +65,7 @@ impl Default for AppSettings {
             auto_approve: false,
             respect_gitignore: true,
             co_author: true,
+            co_author_json_report: false,
             notifications: true,
             project_prefs: None,
             has_onboarded: false,

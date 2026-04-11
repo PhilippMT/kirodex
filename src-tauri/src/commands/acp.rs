@@ -691,6 +691,7 @@ pub fn task_create(
     let settings = settings_state.0.lock().map_err(|e| e.to_string())?;
     let auto_approve = params.auto_approve.unwrap_or(settings.settings.auto_approve);
     let kiro_bin = settings.settings.kiro_bin.clone();
+    let co_author_json_report = settings.settings.co_author_json_report;
     drop(settings);
 
     let task = Task {
@@ -737,7 +738,26 @@ pub fn task_create(
         "Use conventional commit format: `type(scope): description`.\n\n",
         "---\n\n",
     );
-    let full_prompt = format!("{system_prefix}{}", params.prompt);
+    let json_report_suffix = if co_author_json_report {
+        concat!(
+            "\n\n## Completion report\n\n",
+            "When you finish the task, append a JSON block at the very end of your final message.\n",
+            "Use this exact format:\n\n",
+            "```kirodex-report\n",
+            "{\n",
+            "  \"status\": \"done\" | \"partial\" | \"blocked\",\n",
+            "  \"summary\": \"one-line description of what was done\",\n",
+            "  \"filesChanged\": [\"path/to/file.ts\"],\n",
+            "  \"linesAdded\": 42,\n",
+            "  \"linesRemoved\": 7\n",
+            "}\n",
+            "```\n\n",
+            "Only include the block once, at the end. Do not wrap it in any other code fence.\n",
+        )
+    } else {
+        ""
+    };
+    let full_prompt = format!("{system_prefix}{}{json_report_suffix}", params.prompt);
     let _ = handle.cmd_tx.send(AcpCommand::Prompt(full_prompt));
 
     state.connections.lock().map_err(|e| format!("Lock poisoned: {e}"))?.insert(id, handle);

@@ -115,6 +115,7 @@ export interface AppSettings {
   autoApprove?: boolean
   respectGitignore?: boolean
   coAuthor?: boolean
+  coAuthorJsonReport?: boolean
   notifications?: boolean
   projectPrefs?: Record<string, ProjectPrefs>
   hasOnboarded?: boolean
