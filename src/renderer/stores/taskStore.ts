@@ -568,10 +568,19 @@ export function initTaskListeners(): () => void {
     // Send a native notification when the window is not focused and notifications are enabled
     if (!document.hasFocus() && (useSettingsStore.getState().settings.notifications ?? true)) {
       const task = useTaskStore.getState().tasks[taskId]
-      const title = task?.name ?? 'Agent finished'
+      const taskName = task?.name ?? 'Agent finished'
+      const lastAssistantMsg = task?.messages
+        ?.filter((m) => m.role === 'assistant' && m.content.trim())
+        .at(-1)?.content.replace(/[#*`_~>\[\]()]/g, '').trim()
+      const MAX_BODY_LENGTH = 120
+      const body = lastAssistantMsg
+        ? lastAssistantMsg.length > MAX_BODY_LENGTH
+          ? lastAssistantMsg.slice(0, MAX_BODY_LENGTH) + '…'
+          : lastAssistantMsg
+        : taskName
       import('@tauri-apps/plugin-notification').then(({ isPermissionGranted, sendNotification }) => {
         isPermissionGranted().then((ok) => {
-          if (ok) sendNotification({ title: 'Kirodex', body: title })
+          if (ok) sendNotification({ title: 'Kirodex', body })
         })
       }).catch(() => {})
     }
