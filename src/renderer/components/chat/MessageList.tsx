@@ -18,9 +18,9 @@ const ROW_ESTIMATES: Record<TimelineRow['kind'], number> = {
   'user-message': 60,
   'system-message': 60,
   'assistant-text': 80,
-  'work': 40,
+  'work': 120,
   'working': 40,
-  'changed-files': 64,
+  'changed-files': 140,
 }
 
 interface MessageListProps {

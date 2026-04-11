@@ -244,7 +244,8 @@ export const ChangedFilesSummary = memo(function ChangedFilesSummary({ row }: { 
   let visibleCount = 0
 
   return (
-    <div className="mt-2 mb-4 rounded-lg border border-border/80 bg-card/45 p-2.5" data-timeline-row-kind="changed-files">
+    <div className="pt-2 pb-4" data-timeline-row-kind="changed-files">
+    <div className="rounded-lg border border-border/80 bg-card/45 p-2.5">
       {/* Header */}
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <p className="text-[10px] uppercase tracking-[0.12em] text-foreground/40">
@@ -337,6 +338,7 @@ export const ChangedFilesSummary = memo(function ChangedFilesSummary({ row }: { 
           </button>
         )}
       </div>
+    </div>
     </div>
   )
 })
