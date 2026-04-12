@@ -1,5 +1,13 @@
 # Kirodex Tauri Activity Log
 
+## 2026-04-12 11:12 GST (Dubai)
+
+### AppHeader: Revert top navigation changes from unified title bar migration
+
+Compared all changes between v0.8.6 and HEAD related to traffic lights, window borders, and top navigation. Reverted only the top navigation changes: restored the `<header>` element with `data-tauri-drag-region`, `handleHeaderMouseDown` drag handler, `pl-[90px]` padding, and `getCurrentWindow` import. Removed the `<UnifiedTitleBar>` wrapper from AppHeader. Restored `#root` height to `calc(100% - 28px)`. Kept all traffic light, border/corner radius, scrollbar, and empty state changes intact.
+
+**Modified:** src/renderer/components/AppHeader.tsx, src/tailwind.css
+
 ## 2026-04-12 03:23 GST (Dubai)
 
 ### Chat: Inline image embedding in message context
