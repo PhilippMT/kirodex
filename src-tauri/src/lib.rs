@@ -168,6 +168,7 @@ pub fn run() {
             git::task_diff,
             git::git_diff_file,
             git::git_diff_stats,
+            git::git_staged_stats,
             git::git_remote_url,
             // ACP
             acp::task_create,
