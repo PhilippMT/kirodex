@@ -2,6 +2,7 @@ import { useEffect, useCallback, useState, useRef, memo } from 'react'
 import {
   IconPlayerPause, IconPlayerPlay, IconCircleX, IconGitCompare, IconTerminal2,
   IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand,
+  IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand,
   IconUser, IconLogin, IconLogout, IconRefresh, IconShieldCheck,
 } from '@tabler/icons-react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -41,9 +42,10 @@ interface AppHeaderProps {
   onToggleSidePanel: () => void
   isSidebarCollapsed: boolean
   onToggleSidebar: () => void
+  sidebarPosition?: 'left' | 'right'
 }
 
-const AppHeaderInner = memo(function AppHeaderInner({ sidePanelOpen, onToggleSidePanel, isSidebarCollapsed, onToggleSidebar }: AppHeaderProps) {
+const AppHeaderInner = memo(function AppHeaderInner({ sidePanelOpen, onToggleSidePanel, isSidebarCollapsed, onToggleSidebar, sidebarPosition = 'left' }: AppHeaderProps) {
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId)
   const taskStatus = useTaskStore((s) => selectedTaskId ? s.tasks[selectedTaskId]?.status : null) as TaskStatus | null
   const taskName = useTaskStore((s) => selectedTaskId ? s.tasks[selectedTaskId]?.name : null)
@@ -101,7 +103,10 @@ const AppHeaderInner = memo(function AppHeaderInner({ sidePanelOpen, onToggleSid
               onClick={onToggleSidebar}
               className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
-              {isSidebarCollapsed ? <IconLayoutSidebarLeftExpand className="size-4" aria-hidden /> : <IconLayoutSidebarLeftCollapse className="size-4" aria-hidden />}
+              {isSidebarCollapsed
+                ? (sidebarPosition === 'right' ? <IconLayoutSidebarRightExpand className="size-4" aria-hidden /> : <IconLayoutSidebarLeftExpand className="size-4" aria-hidden />)
+                : (sidebarPosition === 'right' ? <IconLayoutSidebarRightCollapse className="size-4" aria-hidden /> : <IconLayoutSidebarLeftCollapse className="size-4" aria-hidden />)
+              }
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom">Toggle sidebar <kbd className="ml-1 rounded bg-muted px-1 py-0.5 text-[10px]">⌘B</kbd></TooltipContent>

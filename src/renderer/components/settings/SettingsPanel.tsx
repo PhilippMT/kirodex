@@ -564,6 +564,29 @@ export const SettingsPanel = () => {
                       </p>
                     </SettingsCard>
                   </div>
+
+                  <div>
+                    <SectionLabel title="Layout" />
+                    <SettingsCard className="!py-4">
+                      <label className="mb-1.5 block text-[12px] font-medium text-foreground/70">Sidebar position</label>
+                      <div className="flex gap-2">
+                        {(['left', 'right'] as const).map((pos) => (
+                          <button
+                            key={pos}
+                            onClick={() => updateDraft({ sidebarPosition: pos })}
+                            className={cn(
+                              'flex-1 rounded-lg border py-2.5 text-center text-xs font-medium capitalize transition-colors',
+                              (draft.sidebarPosition ?? 'left') === pos
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border/40 text-muted-foreground/60 hover:bg-accent hover:text-foreground',
+                            )}
+                          >
+                            {pos}
+                          </button>
+                        ))}
+                      </div>
+                    </SettingsCard>
+                  </div>
                 </>
               )}
 
@@ -634,7 +657,7 @@ export const SettingsPanel = () => {
                       <Divider />
                       <SettingRow label="Task completion report" description="JSON summary card when a task finishes">
                         <Switch
-                          checked={draft.coAuthorJsonReport ?? false}
+                          checked={draft.coAuthorJsonReport ?? true}
                           onCheckedChange={(checked) => updateDraft({ coAuthorJsonReport: checked })}
                           aria-label="Toggle task completion report"
                         />

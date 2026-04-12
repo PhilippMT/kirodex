@@ -31,6 +31,7 @@ import { useKiroStore, initKiroListeners } from "@/stores/kiroStore";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useUpdateChecker } from "@/hooks/useUpdateChecker";
 import { useShallow } from "zustand/react/shallow";
+import { cn } from "@/lib/utils";
 import { IconStack2, IconPlus, IconFolderOpen } from "@tabler/icons-react";
 const Onboarding = lazy(() =>
   import("@/components/Onboarding").then((m) => ({ default: m.Onboarding })),
@@ -181,6 +182,8 @@ export function App() {
   const settingsLoaded = useSettingsStore((s) => s.isLoaded);
   const hasOnboarded = useSettingsStore((s) => s.settings.hasOnboarded);
   const fontSize = useSettingsStore((s) => s.settings.fontSize);
+  const sidebarPosition = useSettingsStore((s) => s.settings.sidebarPosition ?? 'left');
+  const isRightSidebar = sidebarPosition === 'right';
   useKeyboardShortcuts();
 
   // Apply font size from settings to the document root
@@ -259,22 +262,23 @@ export function App() {
             onToggleSidePanel={toggleSidePanel}
             isSidebarCollapsed={isSidebarCollapsed}
             onToggleSidebar={toggleSidebar}
+            sidebarPosition={sidebarPosition}
           />
         </ErrorBoundary>
 
         {/* Main area: sidebar + content + side panel */}
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <ErrorBoundary>
-            {!isSidebarCollapsed && <TaskSidebar width={sidebarWidth} onResize={setSidebarWidth} />}
+            {!isSidebarCollapsed && <TaskSidebar width={sidebarWidth} onResize={setSidebarWidth} position={sidebarPosition} />}
           </ErrorBoundary>
-          <main data-testid="main-content" className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+          <main data-testid="main-content" className={cn('flex min-h-0 min-w-0 flex-1 overflow-hidden', isRightSidebar && 'order-first')}>
             <ErrorBoundary>
               <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl" style={{ fontSize: 'var(--app-font-size, 14px)' }}>
                 <Suspense>
                   {selectedTaskId ? (
                     <ChatPanel />
                   ) : pendingWorkspace ? (
-                    <PendingChat workspace={pendingWorkspace} />
+                    <PendingChat key={pendingWorkspace} workspace={pendingWorkspace} />
                   ) : (
                     <EmptyState />
                   )}

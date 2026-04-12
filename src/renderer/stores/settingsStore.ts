@@ -54,6 +54,7 @@ const defaultSettings: AppSettings = {
   kiroBin: 'kiro-cli',
   agentProfiles: [],
   fontSize: 13,
+  sidebarPosition: 'left',
 }
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({

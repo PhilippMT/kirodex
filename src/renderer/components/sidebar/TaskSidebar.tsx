@@ -1,6 +1,7 @@
 import { memo, useCallback, useRef, useState } from 'react'
-import { IconPlus, IconArrowsUpDown, IconCheck } from '@tabler/icons-react'
+import { IconPlus, IconArrowsUpDown, IconCheck, IconLayoutSidebarLeftCollapse, IconLayoutSidebarRightCollapse } from '@tabler/icons-react'
 import { useTaskStore } from '@/stores/taskStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import { useShallow } from 'zustand/react/shallow'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -67,17 +68,33 @@ const SortDropdown = memo(function SortDropdown({ sort, onChange }: { sort: Sort
 interface TaskSidebarProps {
   width: number
   onResize: (width: number) => void
+  position?: 'left' | 'right'
 }
 
-export const TaskSidebar = memo(function TaskSidebar({ width, onResize }: TaskSidebarProps) {
+export const TaskSidebar = memo(function TaskSidebar({ width, onResize, position = 'left' }: TaskSidebarProps) {
+  const isRight = position === 'right'
   const [sort, setSort] = useState<SortKey>('recent')
   const projectList = useSidebarTasks(sort)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
   const dragSrcIdx = useRef<number | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
 
-  const { selectedTaskId, setSelectedTask, setView, setNewProjectOpen, removeTask, removeProject, archiveThreads, renameProject, renameTask, reorderProject } = useTaskStore(
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setCtxMenu({ x: e.clientX, y: e.clientY })
+  }, [])
+
+  const handleSwitchSide = useCallback(() => {
+    setCtxMenu(null)
+    const store = useSettingsStore.getState()
+    const next = position === 'left' ? 'right' : 'left'
+    store.saveSettings({ ...store.settings, sidebarPosition: next })
+  }, [position])
+
+  const { selectedTaskId, pendingWorkspace, setSelectedTask, setView, setNewProjectOpen, removeTask, removeProject, archiveThreads, renameProject, renameTask, reorderProject } = useTaskStore(
     useShallow((s) => ({
       selectedTaskId: s.selectedTaskId,
+      pendingWorkspace: s.pendingWorkspace,
       setSelectedTask: s.setSelectedTask,
       setView: s.setView,
       setNewProjectOpen: s.setNewProjectOpen,
@@ -90,8 +107,27 @@ export const TaskSidebar = memo(function TaskSidebar({ width, onResize }: TaskSi
     }))
   )
 
-  const handleSelectTask = useCallback((id: string) => { setSelectedTask(id); setView('chat') }, [setSelectedTask, setView])
-  const handleDeleteTask = useCallback((id: string) => { void ipc.cancelTask(id).catch(() => {}); removeTask(id); void ipc.deleteTask(id) }, [removeTask])
+  const handleSelectTask = useCallback((id: string) => {
+    if (id.startsWith('draft:')) {
+      useTaskStore.getState().setPendingWorkspace(id.slice(6))
+    } else {
+      setSelectedTask(id); setView('chat')
+    }
+  }, [setSelectedTask, setView])
+  const handleDeleteTask = useCallback((id: string) => {
+    if (id.startsWith('draft:')) {
+      const ws = id.slice(6)
+      const store = useTaskStore.getState()
+      // Clear pendingWorkspace first so PendingChat unmounts before removeDraft,
+      // preventing the unmount flush from resurrecting the draft
+      if (store.pendingWorkspace === ws) {
+        store.setPendingWorkspace(null)
+      }
+      store.removeDraft(ws)
+    } else {
+      void ipc.cancelTask(id).catch(() => {}); removeTask(id); void ipc.deleteTask(id)
+    }
+  }, [removeTask])
   const handleNewThread = useCallback((workspace: string) => { useTaskStore.getState().setPendingWorkspace(workspace) }, [])
 
   // Project drag-to-reorder handlers
@@ -111,18 +147,29 @@ export const TaskSidebar = memo(function TaskSidebar({ width, onResize }: TaskSi
 
   // Sidebar edge resize
   const handleResizeStart = useResizeHandle({
-    axis: 'horizontal', size: width, onResize, min: 180, max: Math.round(window.innerWidth * 0.2),
+    axis: 'horizontal', size: width, onResize, min: 180, max: Math.round(window.innerWidth * 0.2), reverse: isRight,
   })
 
   return (
-    <div data-testid="task-sidebar" className="relative flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r bg-card pl-1 text-foreground" style={{ width }}>
+    <div data-testid="task-sidebar" onContextMenu={handleContextMenu} className={cn('relative flex h-full min-h-0 shrink-0 flex-col overflow-hidden bg-card text-foreground', isRight ? 'border-l pr-1 order-last' : 'border-r pl-1')} style={{ width }}>
+      {ctxMenu && (
+        <>
+          <div className="fixed inset-0 z-[199]" onClick={() => setCtxMenu(null)} onContextMenu={(e) => { e.preventDefault(); setCtxMenu(null) }} />
+          <div className="fixed z-[200] min-w-[160px] rounded-lg border border-border bg-popover py-1 shadow-lg" style={{ top: ctxMenu.y, left: ctxMenu.x }}>
+            <button type="button" onClick={handleSwitchSide} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-accent transition-colors">
+              {isRight ? <IconLayoutSidebarLeftCollapse className="size-3.5" /> : <IconLayoutSidebarRightCollapse className="size-3.5" />}
+              Move sidebar to {isRight ? 'left' : 'right'}
+            </button>
+          </div>
+        </>
+      )}
       <div
         role="separator"
         aria-orientation="vertical"
         aria-label="Resize sidebar"
         tabIndex={0}
         onMouseDown={handleResizeStart}
-        className="absolute right-0 top-0 z-10 h-full w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors"
+        className={cn('absolute top-0 z-10 h-full w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors', isRight ? 'left-0' : 'right-0')}
       />
       <div className="flex items-center justify-between px-4 py-2 pr-3">
         <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">Projects</span>
@@ -152,7 +199,7 @@ export const TaskSidebar = memo(function TaskSidebar({ width, onResize }: TaskSi
                   name={project.name}
                   cwd={project.cwd}
                   tasks={project.tasks}
-                  selectedTaskId={selectedTaskId}
+                  selectedTaskId={selectedTaskId ?? (pendingWorkspace ? `draft:${pendingWorkspace}` : null)}
                   isDragOver={dragOverIdx === idx && dragSrcIdx.current !== idx}
                   onSelectTask={handleSelectTask}
                   onNewThread={() => handleNewThread(project.cwd)}

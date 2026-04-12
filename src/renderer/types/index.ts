@@ -107,6 +107,8 @@ export interface ProjectPrefs {
   autoApprove?: boolean
 }
 
+export type SidebarPosition = 'left' | 'right'
+
 export interface AppSettings {
   kiroBin: string
   agentProfiles: AgentProfile[]
@@ -119,6 +121,7 @@ export interface AppSettings {
   notifications?: boolean
   projectPrefs?: Record<string, ProjectPrefs>
   hasOnboarded?: boolean
+  sidebarPosition?: SidebarPosition
 }
 
 export interface ProjectFile {
