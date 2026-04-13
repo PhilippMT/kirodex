@@ -1,3 +1,22 @@
+<<<<<<< Updated upstream
+=======
+## 2026-04-13 09:45 GST (Dubai)
+
+### CSS: Fix bottom margin gap in production builds
+
+Fixed the `#root` element height from `calc(100% - 28px)` to `100%`. The previous calculation subtracted 28px to account for the macOS title bar overlay, but this created a visible 28px gap at the bottom of the window in production builds. The app's 44px toolbar already handles the title bar overlay area, so the root element should fill the entire viewport.
+
+**Modified:** src/tailwind.css
+
+## 2026-04-13 09:28 GST (Dubai)
+
+### UI: Visual refresh — cleaner header, simplified sidebar, dark theme contrast
+
+Removed the Kirodex logo and Beta badge from the app header for a cleaner look. Reduced header height from 44px to 38px and tightened traffic-light padding. Simplified sidebar project group headers by replacing folder icons with chevrons, reducing font weight and size. Tightened thread item spacing for a denser list. Added a prominent "New Thread" dashed-border button at the top of the sidebar. Introduced a `--sidebar` CSS variable for subtle sidebar/content contrast in both light and dark themes.
+
+**Modified:** src/renderer/components/AppHeader.tsx, src/renderer/components/sidebar/ProjectItem.tsx, src/renderer/components/sidebar/TaskSidebar.tsx, src/renderer/components/sidebar/ThreadItem.tsx, src/tailwind.css
+
+>>>>>>> Stashed changes
 ## 2026-04-13 09:15 GST (Dubai)
 
 ### Analytics: Opt-in PostHog + Homebrew download snapshots
