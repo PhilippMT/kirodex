@@ -1,5 +1,3 @@
-<<<<<<< Updated upstream
-=======
 ## 2026-04-13 09:45 GST (Dubai)
 
 ### CSS: Fix bottom margin gap in production builds
@@ -16,7 +14,6 @@ Removed the Kirodex logo and Beta badge from the app header for a cleaner look. 
 
 **Modified:** src/renderer/components/AppHeader.tsx, src/renderer/components/sidebar/ProjectItem.tsx, src/renderer/components/sidebar/TaskSidebar.tsx, src/renderer/components/sidebar/ThreadItem.tsx, src/tailwind.css
 
->>>>>>> Stashed changes
 ## 2026-04-13 09:15 GST (Dubai)
 
 ### Analytics: Opt-in PostHog + Homebrew download snapshots
