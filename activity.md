@@ -1,3 +1,27 @@
+## 2026-04-13 11:56 GST (Dubai)
+
+### AppHeader: Replace shield icon with user-check for auth indicator
+
+Swapped `IconShieldCheck` → `IconUserCheck` for the authenticated user menu button. A person with a checkmark is a more natural "logged in" indicator than a shield.
+
+**Modified:** `src/renderer/components/AppHeader.tsx`
+
+## 2026-04-13 11:53 GST (Dubai)
+
+### AppHeader: Ghost-style placeholders when no project is open
+
+Replaced the plain "Kirodex" text with ghost/skeleton-style placeholders that mimic the real header layout. When no workspace is active, the breadcrumb shows two subtle rounded bars (project name + thread name ghosts), and the right side shows faded outlines of the diff, git, and terminal buttons. This previews what the header looks like with a project open, using very low-opacity backgrounds (`muted-foreground/6–15`) and `pointer-events-none` so they're non-interactive.
+
+**Modified:** `src/renderer/components/AppHeader.tsx`
+
+## 2026-04-13 11:25 GST (Dubai)
+
+### AppHeader: Show app name when no project is open
+
+When no workspace is active, the header breadcrumb now displays "Kirodex" as the app name instead of showing an empty bar. This gives the header visual identity when no project or thread is selected.
+
+**Modified:** `src/renderer/components/AppHeader.tsx`
+
 ## 2026-04-13 10:27 GST (Dubai)
 
 ### Build: Fix CI productName to "Kirodex" instead of "Kirodex-dev"

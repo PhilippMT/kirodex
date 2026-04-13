@@ -3,7 +3,7 @@ import {
   IconPlayerPause, IconPlayerPlay, IconCircleX, IconGitCompare, IconTerminal2,
   IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand,
   IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand,
-  IconUser, IconLogin, IconLogout, IconRefresh, IconShieldCheck,
+  IconUser, IconLogin, IconLogout, IconRefresh, IconUserCheck,
 } from '@tabler/icons-react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useTaskStore } from '@/stores/taskStore'
@@ -105,12 +105,17 @@ const AppHeaderInner = memo(function AppHeaderInner({ sidePanelOpen, onToggleSid
         </Tooltip>
 
         {/* Project */}
-        {projectName && (
+        {projectName ? (
           <>
             <Sep />
             <span data-tauri-drag-region className="min-w-0 max-w-[160px] truncate text-[13px] text-muted-foreground" title={workspace ?? undefined}>
               {projectName}
             </span>
+          </>
+        ) : (
+          <>
+            <Sep />
+            <span data-tauri-drag-region className="h-3 w-20 rounded bg-muted-foreground/8" />
           </>
         )}
 
@@ -127,12 +132,33 @@ const AppHeaderInner = memo(function AppHeaderInner({ sidePanelOpen, onToggleSid
             <Sep />
             <span className="text-[13px] text-muted-foreground/60">New thread</span>
           </>
+        ) : !workspace ? (
+          <>
+            <Sep />
+            <span data-tauri-drag-region className="h-3 w-28 rounded bg-muted-foreground/6" />
+          </>
         ) : null}
 
 
       </nav>
 
-      {/* Actions (right) — show editor when any workspace is active, task actions when task exists */}
+      {/* Actions (right) — ghost placeholders when no workspace, real actions otherwise */}
+      {!workspace && (
+        <div className="flex shrink-0 items-center gap-2 pointer-events-none" aria-hidden>
+          <div className="h-5 w-14 rounded bg-muted-foreground/6" />
+          <div className="flex">
+            <div className="inline-flex h-6 items-center gap-1.5 rounded-l-md border border-muted-foreground/8 px-1.5">
+              <IconGitCompare className="size-3 text-muted-foreground/15" />
+            </div>
+            <div className="inline-flex h-6 items-center rounded-r-md border border-l-0 border-muted-foreground/8 px-1.5">
+              <span className="h-2 w-2 rounded-sm bg-muted-foreground/10" />
+            </div>
+          </div>
+          <div className="inline-flex h-6 items-center rounded-md border border-muted-foreground/8 px-1.5">
+            <IconTerminal2 className="size-3 text-muted-foreground/15" />
+          </div>
+        </div>
+      )}
       {workspace && (
         <div className="flex shrink-0 items-center gap-2">
           <ErrorBoundary fallback={null}>
@@ -266,7 +292,7 @@ const UserMenu = memo(function UserMenu() {
               !kiroAuthChecked && 'animate-pulse',
             )}
           >
-            {kiroAuth ? <IconShieldCheck className="size-4" /> : <IconUser className="size-4" />}
+            {kiroAuth ? <IconUserCheck className="size-4" /> : <IconUser className="size-4" />}
           </button>
         </TooltipTrigger>
         <TooltipContent side="bottom">
