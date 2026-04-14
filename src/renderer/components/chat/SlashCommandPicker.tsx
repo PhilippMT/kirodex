@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
+import { fuzzyScore } from '@/lib/fuzzy-search'
 import type { SlashCommand } from '@/stores/settingsStore'
 
 // Strip leading slash from command name (ACP sends "/agent", we display "/agent" ourselves)
@@ -120,7 +121,20 @@ export const SlashCommandPicker = memo(function SlashCommandPicker({
 }: SlashCommandPickerProps) {
   const listRef = useRef<HTMLUListElement>(null)
   const filtered = query
-    ? commands.filter((c) => displayName(c.name).toLowerCase().startsWith(query.toLowerCase()))
+    ? commands
+        .map((c) => {
+          const name = displayName(c.name)
+          const desc = COMMAND_DESCRIPTIONS[name] ?? c.description ?? ''
+          const nameScore = fuzzyScore(query, name)
+          const descScore = fuzzyScore(query, desc)
+          const best = nameScore !== null && descScore !== null
+            ? Math.min(nameScore, descScore + 50)
+            : nameScore ?? (descScore !== null ? descScore + 50 : null)
+          return { cmd: c, score: best }
+        })
+        .filter((r): r is { cmd: SlashCommand; score: number } => r.score !== null)
+        .sort((a, b) => a.score - b.score)
+        .map((r) => r.cmd)
     : commands
   useEffect(() => {
     const el = listRef.current?.children[activeIndex] as HTMLElement | undefined

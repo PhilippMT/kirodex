@@ -1,6 +1,7 @@
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useMemo, useRef, useState } from 'react'
 import { IconCode, IconListCheck, IconRobot } from '@tabler/icons-react'
 import { cn } from '@/lib/utils'
+import { fuzzyScore } from '@/lib/fuzzy-search'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { useKiroStore } from '@/stores/kiroStore'
@@ -25,6 +26,22 @@ const BUILT_IN_AGENTS = [
 const ModelPickerPanel = memo(function ModelPickerPanel({ onDismiss }: { onDismiss: () => void }) {
   const models = useSettingsStore((s) => s.availableModels)
   const currentId = useSettingsStore((s) => s.currentModelId)
+  const [query, setQuery] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return models
+    return models
+      .map((m) => {
+        const nameScore = fuzzyScore(query, m.name)
+        const idScore = fuzzyScore(query, m.modelId)
+        const best = nameScore !== null && idScore !== null ? Math.min(nameScore, idScore) : nameScore ?? idScore
+        return { model: m, score: best }
+      })
+      .filter((r): r is { model: typeof models[number]; score: number } => r.score !== null)
+      .sort((a, b) => a.score - b.score)
+      .map((r) => r.model)
+  }, [models, query])
 
   const handleSelect = (modelId: string) => {
     const { activeWorkspace, setProjectPref } = useSettingsStore.getState()
@@ -47,8 +64,21 @@ const ModelPickerPanel = memo(function ModelPickerPanel({ onDismiss }: { onDismi
       <div className="px-3 pt-2 pb-1">
         <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Models</span>
       </div>
+      {models.length > 5 && (
+        <div className="px-3 pb-1">
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search models…"
+            autoFocus
+            className="w-full rounded-md border border-border/40 bg-background/50 px-2 py-1 text-[12px] text-foreground outline-none placeholder:text-muted-foreground/50 focus:border-border/80"
+          />
+        </div>
+      )}
       <ul className="max-h-[200px] overflow-y-auto pb-1">
-        {models.map((m) => {
+        {filtered.map((m) => {
           const isActive = m.modelId === currentId
           return (
             <li
@@ -77,6 +107,7 @@ const AgentListPanel = memo(function AgentListPanel({ onDismiss }: { onDismiss: 
   const servers = useSettingsStore((s) => s.liveMcpServers)
   const currentModeId = useSettingsStore((s) => s.currentModeId)
   const kiroAgents = useKiroStore((s) => s.config.agents)
+  const [query, setQuery] = useState('')
 
   const handleSelectAgent = useCallback((agentId: string) => {
     useSettingsStore.setState({ currentModeId: agentId })
@@ -92,45 +123,104 @@ const AgentListPanel = memo(function AgentListPanel({ onDismiss }: { onDismiss: 
   const formatName = (name: string): string =>
     name.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
+  const q = query.trim()
+  const totalItems = BUILT_IN_AGENTS.length + kiroAgents.length + servers.length
+  const hasSearch = totalItems > 5
+
+  const filteredBuiltIn = useMemo(() => {
+    if (!q) return [...BUILT_IN_AGENTS]
+    return BUILT_IN_AGENTS
+      .map((a) => {
+        const nameScore = fuzzyScore(q, a.name)
+        const descScore = fuzzyScore(q, a.description)
+        const best = nameScore !== null && descScore !== null ? Math.min(nameScore, descScore + 50) : nameScore ?? (descScore !== null ? descScore + 50 : null)
+        return { agent: a, score: best }
+      })
+      .filter((r): r is { agent: typeof BUILT_IN_AGENTS[number]; score: number } => r.score !== null)
+      .sort((a, b) => a.score - b.score)
+      .map((r) => r.agent)
+  }, [q])
+
+  const filteredKiro = useMemo(() => {
+    if (!q) return kiroAgents
+    return kiroAgents
+      .map((a) => {
+        const nameScore = fuzzyScore(q, a.name)
+        const descScore = fuzzyScore(q, a.description)
+        const best = nameScore !== null && descScore !== null ? Math.min(nameScore, descScore + 50) : nameScore ?? (descScore !== null ? descScore + 50 : null)
+        return { agent: a, score: best }
+      })
+      .filter((r): r is { agent: typeof kiroAgents[number]; score: number } => r.score !== null)
+      .sort((a, b) => a.score - b.score)
+      .map((r) => r.agent)
+  }, [q, kiroAgents])
+
+  const filteredServers = useMemo(() => {
+    if (!q) return servers
+    return servers
+      .map((s) => ({ server: s, score: fuzzyScore(q, s.name) }))
+      .filter((r): r is { server: typeof servers[number]; score: number } => r.score !== null)
+      .sort((a, b) => a.score - b.score)
+      .map((r) => r.server)
+  }, [q, servers])
+
   return (
     <PanelShell>
+      {/* Search input */}
+      {hasSearch && (
+        <div className="px-3 pt-2 pb-1">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search agents & servers…"
+            autoFocus
+            className="w-full rounded-md border border-border/40 bg-background/50 px-2 py-1 text-[12px] text-foreground outline-none placeholder:text-muted-foreground/50 focus:border-border/80"
+          />
+        </div>
+      )}
+
       {/* Built-in agents */}
-      <div className="px-3 pt-2 pb-1">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Agents</span>
-      </div>
-      <ul className="pb-1">
-        {BUILT_IN_AGENTS.map((agent) => {
-          const isActive = currentModeId === agent.id
-          const Icon = agent.icon
-          return (
-            <li
-              key={agent.id}
-              role="option"
-              aria-selected={isActive}
-              onMouseDown={(e) => { e.preventDefault(); handleSelectAgent(agent.id) }}
-              className={cn(
-                'flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-[12px] transition-colors',
-                isActive ? 'text-foreground' : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-              )}
-            >
-              <Icon className={cn('size-3.5 shrink-0', isActive ? agent.color : 'text-muted-foreground/60')} />
-              <span className={cn('flex-1', isActive && 'font-medium')}>{agent.name}</span>
-              <span className="text-[10px] text-muted-foreground/50">{agent.description}</span>
-              {isActive && <span className="text-[10px] text-primary/60">active</span>}
-            </li>
-          )
-        })}
-      </ul>
+      {filteredBuiltIn.length > 0 && (
+        <>
+          <div className="px-3 pt-2 pb-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Agents</span>
+          </div>
+          <ul className="pb-1">
+            {filteredBuiltIn.map((agent) => {
+              const isActive = currentModeId === agent.id
+              const Icon = agent.icon
+              return (
+                <li
+                  key={agent.id}
+                  role="option"
+                  aria-selected={isActive}
+                  onMouseDown={(e) => { e.preventDefault(); handleSelectAgent(agent.id) }}
+                  className={cn(
+                    'flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-[12px] transition-colors',
+                    isActive ? 'text-foreground' : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+                  )}
+                >
+                  <Icon className={cn('size-3.5 shrink-0', isActive ? agent.color : 'text-muted-foreground/60')} />
+                  <span className={cn('flex-1', isActive && 'font-medium')}>{agent.name}</span>
+                  <span className="text-[10px] text-muted-foreground/50">{agent.description}</span>
+                  {isActive && <span className="text-[10px] text-primary/60">active</span>}
+                </li>
+              )
+            })}
+          </ul>
+        </>
+      )}
 
       {/* .kiro agents */}
-      {kiroAgents.length > 0 && (
+      {filteredKiro.length > 0 && (
         <>
           <div className="mx-3 border-t border-border/40" />
           <div className="px-3 pt-2 pb-1">
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">.kiro Agents</span>
           </div>
           <ul className="max-h-[160px] overflow-y-auto pb-1">
-            {kiroAgents.map((agent) => {
+            {filteredKiro.map((agent) => {
               const isActive = currentModeId === agent.name
               return (
                 <li
@@ -155,14 +245,14 @@ const AgentListPanel = memo(function AgentListPanel({ onDismiss }: { onDismiss: 
       )}
 
       {/* MCP servers */}
-      {servers.length > 0 && (
+      {filteredServers.length > 0 && (
         <>
           <div className="mx-3 border-t border-border/40" />
           <div className="px-3 pt-2 pb-1">
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">MCP Servers</span>
           </div>
           <div className="max-h-[160px] overflow-y-auto pb-1">
-            {servers.map((server) => {
+            {filteredServers.map((server) => {
               const dot = STATUS_DOT[server.status] ?? STATUS_DOT.loading
               return (
                 <div
@@ -180,6 +270,11 @@ const AgentListPanel = memo(function AgentListPanel({ onDismiss }: { onDismiss: 
             })}
           </div>
         </>
+      )}
+
+      {/* Empty state when search has no results */}
+      {filteredBuiltIn.length === 0 && filteredKiro.length === 0 && filteredServers.length === 0 && q && (
+        <p className="px-3 py-3 text-xs text-muted-foreground/70">No matches for "{q}"</p>
       )}
     </PanelShell>
   )
