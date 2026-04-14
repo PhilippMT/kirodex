@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useRef, useState } from 'react'
-import { IconCode, IconListCheck, IconRobot } from '@tabler/icons-react'
+import { IconCode, IconListCheck, IconRobot, IconX } from '@tabler/icons-react'
 import { cn } from '@/lib/utils'
 import { fuzzyScore } from '@/lib/fuzzy-search'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -54,13 +54,13 @@ const ModelPickerPanel = memo(function ModelPickerPanel({ onDismiss }: { onDismi
   }
 
   if (models.length === 0) return (
-    <PanelShell>
+    <PanelShell onDismiss={onDismiss}>
       <p className="px-3 py-3 text-xs text-muted-foreground/70">No models available</p>
     </PanelShell>
   )
 
   return (
-    <PanelShell>
+    <PanelShell onDismiss={onDismiss}>
       <div className="px-3 pt-2 pb-1">
         <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Models</span>
       </div>
@@ -165,7 +165,7 @@ const AgentListPanel = memo(function AgentListPanel({ onDismiss }: { onDismiss: 
   }, [q, servers])
 
   return (
-    <PanelShell>
+    <PanelShell onDismiss={onDismiss}>
       {/* Search input */}
       {hasSearch && (
         <div className="px-3 pt-2 pb-1">
@@ -281,9 +281,20 @@ const AgentListPanel = memo(function AgentListPanel({ onDismiss }: { onDismiss: 
 })
 
 // ── Shared panel shell ──────────────────────────────────────────────
-function PanelShell({ children }: { children: React.ReactNode }) {
+function PanelShell({ children, onDismiss }: { children: React.ReactNode; onDismiss?: () => void }) {
   return (
     <div className="absolute bottom-full left-0 right-0 z-[300] mb-2 overflow-hidden rounded-xl border border-border bg-popover shadow-xl">
+      {onDismiss && (
+        <button
+          type="button"
+          aria-label="Close panel"
+          tabIndex={0}
+          onMouseDown={(e) => { e.preventDefault(); onDismiss() }}
+          className="absolute right-2 top-2 z-10 flex size-5 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-accent/50 hover:text-foreground"
+        >
+          <IconX className="size-3" />
+        </button>
+      )}
       {children}
     </div>
   )
@@ -308,7 +319,7 @@ const UsagePanel = memo(function UsagePanel({ onDismiss }: { onDismiss: () => vo
   const totalUsed = useMemo(() => entries.reduce((sum, t) => sum + (t.contextUsage?.used ?? 0), 0), [entries])
   const totalSize = useMemo(() => entries.reduce((sum, t) => sum + (t.contextUsage?.size ?? 0), 0), [entries])
   return (
-    <PanelShell>
+    <PanelShell onDismiss={onDismiss}>
       <div className="px-3 pt-2 pb-1">
         <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Token Usage</span>
       </div>
