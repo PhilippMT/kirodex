@@ -213,24 +213,36 @@ const searchFiles = (files: ProjectFile[], query: string, limit: number = 50): P
 export const FileMentionPill = memo(function FileMentionPill({ path, onRemove }: { path: string; onRemove?: () => void }) {
   const isAgent = path.startsWith('agent:')
   const isSkill = path.startsWith('skill:')
-  const name = isAgent || isSkill ? path.split(':').slice(1).join(':') : (path.split('/').pop() ?? path)
-  const ext = (!isAgent && !isSkill && name.includes('.')) ? name.split('.').pop() ?? '' : ''
+  const rawName = isAgent || isSkill ? path.split(':').slice(1).join(':') : (path.split('/').pop() ?? path)
+  const ext = (!isAgent && !isSkill && rawName.includes('.')) ? rawName.split('.').pop() ?? '' : ''
 
-  const icon = isAgent
-    ? <IconRobot className="size-3.5 text-purple-400" />
-    : isSkill
-      ? <IconTool className="size-3.5 text-yellow-400" />
-      : <FileIcon ext={ext} isDir={false} />
+  const formatName = (name: string): string =>
+    name.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+
+  const displayName = isAgent ? formatName(rawName) : rawName
+
+  let icon: React.ReactNode
+  let pillCls: string
+  if (isAgent) {
+    const meta = getAgentPillMeta(path)
+    const AgentIcon = meta.icon
+    icon = <AgentIcon className={cn('size-3.5', meta.color)} />
+    pillCls = `${meta.bgCls} text-foreground/90`
+  } else if (isSkill) {
+    icon = <IconTool className="size-3.5 text-yellow-400" />
+    pillCls = 'bg-yellow-500/15 text-yellow-300'
+  } else {
+    icon = <FileIcon ext={ext} isDir={false} />
+    pillCls = 'bg-accent/60 text-foreground/70'
+  }
 
   return (
     <span className={cn(
       'inline-flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-medium align-middle',
-      isAgent ? 'bg-blue-500/15 text-blue-300' :
-      isSkill ? 'bg-yellow-500/15 text-yellow-300' :
-      'bg-accent/60 text-foreground/70',
+      pillCls,
     )}>
       {icon}
-      <span className="max-w-[160px] truncate">{name}</span>
+      <span className="max-w-[160px] truncate">{displayName}</span>
       {onRemove && (
         <button
           type="button"
@@ -289,11 +301,16 @@ export const FileMentionPicker = memo(function FileMentionPicker({
     return () => { cancelled = true }
   }, [workspace, respectGitignore])
 
-  // Build kiro items filtered by query
+  // Build kiro items filtered by query — built-in agents first, then .kiro agents, then skills
   const q = (query ?? '').replace(/^[@./]+/, '').trim().toLowerCase()
-  const kiroItems: Array<{ type: 'agent' | 'skill'; name: string; description?: string }> = []
+  const kiroItems: Array<{ type: 'agent' | 'skill'; name: string; description?: string; builtinIcon?: typeof IconRobot; builtinColor?: string; builtinBgCls?: string }> = []
+  for (const b of BUILT_IN_MENTION_AGENTS) {
+    if (!q || b.name.toLowerCase().includes(q) || b.id.toLowerCase().includes(q)) {
+      kiroItems.push({ type: 'agent', name: b.id, description: b.description, builtinIcon: b.icon, builtinColor: b.color, builtinBgCls: b.bgCls })
+    }
+  }
   for (const a of agents) {
-    if (!q || a.name.toLowerCase().includes(q)) {
+    if (!q || a.name.toLowerCase().includes(q) || a.description.toLowerCase().includes(q)) {
       kiroItems.push({ type: 'agent', name: a.name, description: a.description })
     }
   }
@@ -361,6 +378,14 @@ export const FileMentionPicker = memo(function FileMentionPicker({
       <ul ref={listRef} className="max-h-[280px] overflow-y-auto py-1">
         {kiroItems.map((item, i) => {
           const isActive = i === activeIndex % totalItems
+          const formatName = (name: string): string =>
+            name.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+          const ItemIcon = item.builtinIcon ?? (item.type === 'agent' ? IconRobot : IconTool)
+          const iconColor = item.builtinColor ?? (item.type === 'agent' ? 'text-violet-400' : 'text-yellow-400')
+          const iconBg = item.builtinBgCls ?? (item.type === 'agent' ? 'bg-violet-500/20' : 'bg-yellow-500/20')
+          const displayName = item.builtinIcon
+            ? BUILT_IN_MENTION_AGENTS.find((b) => b.id === item.name)?.name ?? item.name
+            : formatName(item.name)
           return (
             <li
               key={`${item.type}:${item.name}`}
@@ -375,14 +400,12 @@ export const FileMentionPicker = memo(function FileMentionPicker({
                 isActive ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
               )}
             >
-              <span className={cn(
-                'flex h-5 w-5 items-center justify-center rounded text-[9px]',
-                item.type === 'agent' ? 'bg-purple-500/20 text-purple-400' : 'bg-yellow-500/20 text-yellow-400',
-              )}>
-                {item.type === 'agent' ? <IconRobot className="size-3" /> : <IconTool className="size-3" />}
+              <span className={cn('flex h-5 w-5 items-center justify-center rounded', iconBg)}>
+                <ItemIcon className={cn('size-3', iconColor)} />
               </span>
               <span className="min-w-0 flex-1 flex items-center gap-1.5">
-                <span className="truncate text-[13px] font-medium">{item.name}</span>
+                <span className="truncate text-[13px] font-medium">{displayName}</span>
+                {item.description && <span className="truncate text-[11px] text-muted-foreground/50">{item.description.slice(0, 50)}</span>}
               </span>
               <span className="shrink-0 text-[10px] text-muted-foreground/60">{item.type}</span>
             </li>
