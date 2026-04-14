@@ -1,5 +1,29 @@
 # Activity Log
 
+## 2026-04-14 16:07 GST (Dubai)
+
+### TaskStore: Per-thread plan mode
+
+Made plan mode per-thread instead of global. Added `taskModes: Record<string, string>` to `taskStore` so each thread independently tracks its own mode. Switching threads restores the correct plan toggle state; new threads always start with plan mode off.
+
+**Modified:** `src/renderer/stores/taskStore.ts`, `src/renderer/App.tsx`, `src/renderer/components/chat/PlanToggle.tsx`, `src/renderer/hooks/useSlashAction.ts`, `src/renderer/components/chat/PlanHandoffCard.tsx`, `src/renderer/components/chat/PendingChat.tsx`, `src/renderer/components/chat/ChatPanel.tsx`
+
+## 2026-04-14 16:07 GST (Dubai)
+
+### Chat: fix agent mode switching and PlanToggle visibility
+
+Mode switching (plan ↔ default) now sends `/agent <modeId>` via `ipc.sendMessage` so kiro-cli actually switches the agent, not just the session mode. PlanToggle no longer depends on `availableModes` being populated; the button always renders since both modes are known client-side.
+
+**Modified:** `src/renderer/hooks/useSlashAction.ts`, `src/renderer/components/chat/PlanToggle.tsx`
+
+## 2026-04-14 16:04 GST (Dubai)
+
+### QuestionCards & CollapsedAnswers: default open + require all answered
+
+CollapsedAnswers now defaults to expanded so users see their answered questions immediately. QuestionCards submit button is disabled until every question with options is answered; the button shows "Next" to navigate to unanswered questions and only enables "Submit" when all are complete. Enter key shortcut and handleContinue are also guarded.
+
+**Modified:** `src/renderer/components/chat/CollapsedAnswers.tsx`, `src/renderer/components/chat/QuestionCards.tsx`
+
 ## 2026-04-14 15:58 GST (Dubai)
 
 ### TaskListDisplay: Check rawInput for completed_task_ids
