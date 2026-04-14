@@ -1,3 +1,11 @@
+## 2026-04-14 12:30 GST (Dubai)
+
+### Chat: Read tool call code viewer
+
+Replaced raw JSON display for `read` tool calls with a compact summary header (e.g., "Read acp.rs lines 631–670") and a line-numbered code viewer with absolute line numbers. Non-read tool calls keep the existing raw JSON display. ReadOutput returns null on parse failure for graceful fallback.
+
+**Modified:** `src/renderer/components/chat/ReadOutput.tsx`, `src/renderer/components/chat/ToolCallEntry.tsx`
+
 ## 2026-04-14 01:41 GST (Dubai)
 
 ### Notifications: Click-to-navigate to correct project and thread

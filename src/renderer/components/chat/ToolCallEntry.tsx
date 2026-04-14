@@ -12,6 +12,7 @@ import { ipc } from '@/lib/ipc'
 import { InlineDiff } from './InlineDiff'
 import { getToolIcon } from './tool-call-utils'
 import { TaskListDisplay, isTaskListToolCall } from './TaskListDisplay'
+import { ReadOutput } from './ReadOutput'
 
 export const ToolCallEntry = memo(function ToolCallEntry({ toolCall, allToolCalls }: { toolCall: ToolCall; allToolCalls: ToolCall[] }) {
   const [expanded, setExpanded] = useState(false)
@@ -111,7 +112,11 @@ export const ToolCallEntry = memo(function ToolCallEntry({ toolCall, allToolCall
 
       {isTaskList && <TaskListDisplay toolCall={toolCall} allToolCalls={allToolCalls} />}
 
-      {expanded && hasContent && !isTaskList && (
+      {expanded && hasContent && !isTaskList && toolCall.kind === 'read' && (
+        <ReadOutput rawInput={toolCall.rawInput} rawOutput={toolCall.rawOutput} />
+      )}
+
+      {expanded && hasContent && !isTaskList && toolCall.kind !== 'read' && (
         <div className="ml-6 mr-2 mb-1.5 mt-1 min-w-0 rounded-md border border-border/30 bg-background/50 px-3 py-2.5 text-[13px] space-y-2">
           {toolCall.content?.map((item, i) => (
             <div key={i}>
