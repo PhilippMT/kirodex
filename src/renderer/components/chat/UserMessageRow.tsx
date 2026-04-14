@@ -129,7 +129,7 @@ export const UserMessageRow = memo(function UserMessageRow({ row }: { row: UserM
     <div data-testid="user-message-row" className="pb-4" data-timeline-row-kind="user-message">
       <div className="flex justify-end">
         <div className="group relative w-fit max-w-[85%] sm:max-w-[75%]">
-          <div className="rounded-2xl rounded-br-md bg-primary/10 px-4 py-2.5 dark:bg-primary/[0.08]">
+          <div className="rounded-2xl rounded-br-md bg-[#2c2e35] px-4 py-2.5">
             {row.questionAnswers?.length ? (
               <CollapsedAnswers questionAnswers={row.questionAnswers} />
             ) : (
