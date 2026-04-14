@@ -178,6 +178,7 @@ pub fn run() {
             acp::task_resume,
             acp::task_cancel,
             acp::task_delete,
+            acp::task_fork,
             acp::task_allow_permission,
             acp::task_deny_permission,
             acp::set_mode,

@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { IconPaperclip, IconClipboard, IconX, IconChevronDown } from '@tabler/icons-react'
+import { IconPaperclip, IconClipboard, IconX, IconChevronDown, IconChevronUp } from '@tabler/icons-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { SlashCommandPicker } from './SlashCommandPicker'
@@ -129,9 +129,11 @@ interface ChatInputProps {
   onPause?: () => void
   onDraftChange?: (value: string) => void
   workspace?: string | null
+  isCollapsed?: boolean
+  onToggleCollapse?: () => void
 }
 
-export const ChatInput = memo(function ChatInput({ disabled, disabledReason, contextUsage, messageCount = 0, isRunning, initialValue, autoFocus, hasQueuedMessages, onSendMessage, onPause, onDraftChange, workspace }: ChatInputProps) {
+export const ChatInput = memo(function ChatInput({ disabled, disabledReason, contextUsage, messageCount = 0, isRunning, initialValue, autoFocus, hasQueuedMessages, onSendMessage, onPause, onDraftChange, workspace, isCollapsed, onToggleCollapse }: ChatInputProps) {
   const {
     value, setValue, textareaRef, canSend,
     slashIndex, slashQuery, commands, filteredCmds, showPicker,
@@ -223,6 +225,28 @@ export const ChatInput = memo(function ChatInput({ disabled, disabledReason, con
   const placeholderText = disabled
     ? (disabledReason ?? 'Task ended')
     : 'Ask anything, @ to mention files, / for commands — Shift+Enter for newline'
+
+  if (isCollapsed) {
+    return (
+      <div data-testid="chat-input-collapsed" className="px-4 pb-3 sm:px-6">
+        <div className="mx-auto w-full min-w-0 max-w-3xl lg:max-w-4xl xl:max-w-5xl">
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            aria-label="Expand chat input"
+            className={cn(
+              'flex w-full items-center justify-between gap-2 rounded-2xl border bg-[#1a1b1e] px-4 py-2.5 transition-colors',
+              borderIdle,
+              'hover:border-muted-foreground/30',
+            )}
+          >
+            <span className="text-[13px] text-muted-foreground/60">Type a message…</span>
+            <IconChevronUp className="size-4 text-muted-foreground/50" />
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div data-testid="chat-input" className="px-4 pt-1.5 pb-4 sm:px-6 sm:pt-2 sm:pb-5">
@@ -327,6 +351,21 @@ export const ChatInput = memo(function ChatInput({ disabled, disabledReason, con
           <div className="relative z-10 flex items-center justify-between gap-2 px-3 pb-3 sm:px-4">
             {/* Left: attach + AI controls (mode + model) */}
             <div className="flex items-center gap-1.5">
+              {onToggleCollapse && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={onToggleCollapse}
+                      aria-label="Collapse chat input"
+                      className="flex size-8 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:bg-muted/60 hover:text-muted-foreground/70"
+                    >
+                      <IconChevronDown className="size-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-[11px]">Collapse input</TooltipContent>
+                </Tooltip>
+              )}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button

@@ -1,4 +1,4 @@
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useState } from 'react'
 import { IconHistory } from '@tabler/icons-react'
 import { useTaskStore } from '@/stores/taskStore'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -140,6 +140,9 @@ export const ChatPanel = memo(function ChatPanel() {
     if (id) useTaskStore.getState().reorderQueuedMessage(id, from, to)
   }, [])
 
+  const [isInputCollapsed, setIsInputCollapsed] = useState(false)
+  const handleToggleCollapse = useCallback(() => setIsInputCollapsed((v) => !v), [])
+
   const handlePermissionSelect = useCallback((optionId: string) => {
     const state = useTaskStore.getState()
     const id = state.selectedTaskId
@@ -213,6 +216,8 @@ export const ChatPanel = memo(function ChatPanel() {
             onSendMessage={handleSendMessage}
             onPause={handlePause}
             workspace={taskWorkspace}
+            isCollapsed={isInputCollapsed}
+            onToggleCollapse={handleToggleCollapse}
           />
         )}
       </div>

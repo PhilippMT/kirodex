@@ -3,7 +3,7 @@ import {
   IconPlayerPause, IconPlayerPlay, IconCircleX, IconGitCompare, IconTerminal2,
   IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand,
   IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand,
-  IconUser, IconLogin, IconLogout, IconRefresh, IconUserCheck,
+  IconUser, IconLogin, IconLogout, IconRefresh, IconUserCheck, IconGitFork,
 } from '@tabler/icons-react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useTaskStore } from '@/stores/taskStore'
@@ -72,6 +72,8 @@ const AppHeaderInner = memo(function AppHeaderInner({ sidePanelOpen, onToggleSid
   const handlePause = useCallback(() => { if (selectedTaskId) ipc.pauseTask(selectedTaskId) }, [selectedTaskId])
   const handleResume = useCallback(() => { if (selectedTaskId) ipc.resumeTask(selectedTaskId) }, [selectedTaskId])
   const handleCancel = useCallback(() => { if (selectedTaskId) ipc.cancelTask(selectedTaskId) }, [selectedTaskId])
+  const forkTask = useTaskStore((s) => s.forkTask)
+  const handleFork = useCallback(() => { if (selectedTaskId) void forkTask(selectedTaskId) }, [selectedTaskId, forkTask])
 
   // Show workspace from task or from pendingWorkspace (before first message)
   const projectName = workspace?.split('/').pop() ?? null
@@ -220,6 +222,23 @@ const AppHeaderInner = memo(function AppHeaderInner({ sidePanelOpen, onToggleSid
             </TooltipTrigger>
             <TooltipContent side="bottom">Terminal</TooltipContent>
           </Tooltip>
+
+          {selectedTaskId && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  data-testid="header-fork-button"
+                  aria-label="Fork thread"
+                  onClick={handleFork}
+                  className="inline-flex h-6 items-center rounded-md border border-input bg-popover px-1.5 text-xs shadow-xs/5 transition-colors hover:bg-accent/50 dark:bg-input/32 text-muted-foreground"
+                >
+                  <IconGitFork className="size-3" aria-hidden />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Fork thread</TooltipContent>
+            </Tooltip>
+          )}
 
           {/* Pause / Resume / Cancel — commented out, kept for future use
           {canPause && (

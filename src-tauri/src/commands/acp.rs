@@ -132,6 +132,7 @@ pub enum AcpCommand {
     Prompt(String),
     Cancel,
     SetMode(String),
+    ForkSession(oneshot::Sender<Result<String, String>>),
     Kill,
 }
 
@@ -677,6 +678,15 @@ async fn run_acp_connection(
                     acp::SetSessionModeRequest::new(session_id.clone(), mode_id)
                 ).await;
             }
+            AcpCommand::ForkSession(reply_tx) => {
+                let result = conn.fork_session(
+                    acp::ForkSessionRequest::new(session_id.clone(), std::path::PathBuf::from(&workspace))
+                ).await;
+                match result {
+                    Ok(resp) => { let _ = reply_tx.send(Ok(resp.session_id.0.to_string())); }
+                    Err(e) => { let _ = reply_tx.send(Err(e.to_string())); }
+                }
+            }
             AcpCommand::Kill => break,
         }
     }
@@ -934,6 +944,102 @@ pub fn task_delete(state: tauri::State<'_, AcpState>, task_id: String) -> Result
     }
     state.tasks.lock().map_err(|e| format!("Lock poisoned: {e}"))?.remove(&task_id);
     Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ForkTaskParams {
+    pub task_id: String,
+    pub workspace: Option<String>,
+    pub parent_name: Option<String>,
+}
+
+#[tauri::command]
+pub fn task_fork(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AcpState>,
+    settings_state: tauri::State<'_, crate::commands::settings::SettingsState>,
+    params: ForkTaskParams,
+) -> Result<Task, String> {
+    let task_id = &params.task_id;
+    // Read parent task if it exists in backend state
+    let parent = {
+        let tasks = state.tasks.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        tasks.get(task_id).cloned()
+    };
+    let workspace = parent.as_ref().map(|p| p.workspace.clone())
+        .or(params.workspace)
+        .ok_or("No workspace found for task")?;
+    let parent_name = parent.as_ref().map(|p| p.name.clone())
+        .or(params.parent_name)
+        .unwrap_or_else(|| "thread".to_string());
+    let parent_messages = parent.as_ref().map(|p| p.messages.clone()).unwrap_or_default();
+    let parent_auto_approve = parent.as_ref().and_then(|p| p.auto_approve);
+    // Try ACP fork if the parent has a live connection
+    let has_live_connection = {
+        let conns = state.connections.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        conns.get(task_id)
+            .map(|h| h.alive.load(std::sync::atomic::Ordering::SeqCst))
+            .unwrap_or(false)
+    };
+    if has_live_connection {
+        let (reply_tx, reply_rx) = oneshot::channel();
+        {
+            let conns = state.connections.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+            if let Some(handle) = conns.get(task_id) {
+                let _ = handle.cmd_tx.send(AcpCommand::ForkSession(reply_tx));
+            }
+        }
+        // Best-effort with 10s timeout to avoid blocking the UI forever
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let result = reply_rx.blocking_recv();
+            let _ = done_tx.send(result);
+        });
+        let _ = done_rx.recv_timeout(std::time::Duration::from_secs(10));
+    }
+    // Create a new task with parent messages
+    let new_id = Uuid::new_v4().to_string();
+    let now = now_rfc3339();
+    let settings = settings_state.0.lock().map_err(|e| e.to_string())?;
+    let auto_approve = parent_auto_approve.unwrap_or(settings.settings.auto_approve);
+    let kiro_bin = settings.settings.kiro_bin.clone();
+    drop(settings);
+    let fork_task = Task {
+        id: new_id.clone(),
+        name: format!("Fork of {}", parent_name),
+        workspace: workspace.clone(),
+        status: "paused".to_string(),
+        created_at: now.clone(),
+        messages: {
+            let mut msgs = parent_messages;
+            msgs.push(TaskMessage {
+                role: "system".to_string(),
+                content: format!("Forked from: {}", parent_name),
+                timestamp: now,
+                tool_calls: None,
+                thinking: None,
+            });
+            msgs
+        },
+        pending_permission: None,
+        plan: None,
+        context_usage: None,
+        auto_approve: Some(auto_approve),
+        user_paused: None,
+    };
+    state.tasks.lock().map_err(|e| format!("Lock poisoned: {e}"))?.insert(new_id.clone(), fork_task.clone());
+    // Spawn a new ACP connection for the forked task
+    let handle = spawn_connection(
+        new_id.clone(),
+        workspace,
+        kiro_bin,
+        auto_approve,
+        app,
+        None,
+    )?;
+    state.connections.lock().map_err(|e| format!("Lock poisoned: {e}"))?.insert(new_id, handle);
+    Ok(fork_task)
 }
 
 #[tauri::command]

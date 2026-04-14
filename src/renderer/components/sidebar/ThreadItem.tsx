@@ -1,5 +1,5 @@
 import { memo, useState, useRef, useEffect, useCallback } from 'react'
-import { IconPencil, IconTrash, IconArchive } from '@tabler/icons-react'
+import { IconPencil, IconTrash, IconArchive, IconGitFork } from '@tabler/icons-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import type { SidebarTask } from '@/hooks/useSidebarTasks'
@@ -27,9 +27,10 @@ interface ThreadItemProps {
   onSelect: () => void
   onDelete: () => void
   onRename: (name: string) => void
+  onFork: () => void
 }
 
-export const ThreadItem = memo(function ThreadItem({ task, isActive, onSelect, onDelete, onRename }: ThreadItemProps) {
+export const ThreadItem = memo(function ThreadItem({ task, isActive, onSelect, onDelete, onRename, onFork }: ThreadItemProps) {
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(task.name)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
@@ -198,6 +199,13 @@ export const ThreadItem = memo(function ThreadItem({ task, isActive, onSelect, o
                     onClick={handleRenameClick}
                   >
                     <IconPencil className="size-3.5" /> Rename
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-[13px] text-foreground transition-colors hover:bg-accent"
+                    onClick={() => { setCtxMenu(null); onFork() }}
+                  >
+                    <IconGitFork className="size-3.5" /> Fork
                   </button>
                   <div className="my-1 border-t border-border/50" />
                 </>

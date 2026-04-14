@@ -1,5 +1,35 @@
 # Activity Log
 
+## 2026-04-14 22:15 GST (Dubai)
+
+### ChatInput: Add collapsible input area
+
+Added a collapse/expand toggle to the ChatInput component. When collapsed, the input shrinks to a compact bar with a "Type a message…" placeholder and an expand chevron. The expanded view gains a collapse button (chevron down) in the footer toolbar. State is managed in ChatPanel via `isInputCollapsed` and passed down as props.
+
+**Modified:**
+- `src/renderer/components/chat/ChatPanel.tsx` — added `isInputCollapsed` state, `handleToggleCollapse`, passed `isCollapsed`/`onToggleCollapse` to ChatInput
+- `src/renderer/components/chat/ChatInput.tsx` — added `isCollapsed`/`onToggleCollapse` props, collapsed bar early return, collapse button in footer toolbar
+
+## 2026-04-14 22:09 GST (Dubai)
+
+### ACP: Wire up fork_session across full stack
+
+Wired up the ACP `fork_session` unstable API end-to-end. Added `ForkSession` variant to `AcpCommand`, `task_fork` Tauri command that calls `conn.fork_session()` and spawns a new connection for the forked task. Frontend: added `forkTask` to IPC, task store action, `/fork` slash command, Fork option in thread context menu (Tabler `IconGitFork`), and fork icon button next to copy on user message bubbles in both `MessageItem` and `UserMessageRow`. Also added fork button to the chat header bar next to the terminal toggle.
+
+**Modified:**
+- `src-tauri/src/commands/acp.rs` — `ForkSession` command variant, fork handler in command loop, `task_fork` Tauri command
+- `src-tauri/src/lib.rs` — registered `task_fork` in invoke_handler
+- `src/renderer/lib/ipc.ts` — `forkTask` IPC call
+- `src/renderer/stores/taskStore.ts` — `forkTask` async action
+- `src/renderer/hooks/useSlashAction.ts` — `/fork` slash command handler
+- `src/renderer/hooks/useChatInput.ts` — `/fork` in client commands list
+- `src/renderer/components/sidebar/ThreadItem.tsx` — Fork in context menu
+- `src/renderer/components/sidebar/ProjectItem.tsx` — `onForkTask` prop
+- `src/renderer/components/sidebar/TaskSidebar.tsx` — `handleForkTask` callback
+- `src/renderer/components/chat/MessageItem.tsx` — fork icon button on user messages
+- `src/renderer/components/chat/UserMessageRow.tsx` — fork icon button on user messages
+- `src/renderer/components/AppHeader.tsx` — fork button in header bar
+
 ## 2026-04-14 21:10 GST (Dubai)
 
 ### SlashPanels & FileMentionPicker: Improve X close button UX

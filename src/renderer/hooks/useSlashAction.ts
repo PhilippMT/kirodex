@@ -49,7 +49,7 @@ export const useSlashAction = (): SlashActionResult => {
     // Track every recognized slash command. The switch below rejects unknown
     // names by returning false, so we gate the track call on that path via
     // the `default` case.
-    const KNOWN = new Set(['clear', 'model', 'agent', 'settings', 'upload', 'plan', 'usage', 'close', 'exit'])
+    const KNOWN = new Set(['clear', 'model', 'agent', 'settings', 'upload', 'plan', 'usage', 'close', 'exit', 'fork'])
     if (KNOWN.has(name)) {
       track('feature_used', { feature: 'slash_command', detail: name })
     }
@@ -103,6 +103,14 @@ export const useSlashAction = (): SlashActionResult => {
           archiveTask(selectedTaskId)
         } else if (pendingWorkspace) {
           setPendingWorkspace(null)
+        }
+        setPanel(null)
+        return true
+      }
+      case 'fork': {
+        const { selectedTaskId, forkTask } = useTaskStore.getState()
+        if (selectedTaskId) {
+          void forkTask(selectedTaskId)
         }
         setPanel(null)
         return true

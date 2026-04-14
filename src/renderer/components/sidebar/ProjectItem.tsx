@@ -16,6 +16,7 @@ interface ProjectItemProps {
   onNewThread: () => void
   onDeleteTask: (id: string) => void
   onRenameTask: (id: string, name: string) => void
+  onForkTask: (id: string) => void
   onRemoveProject: () => void
   onArchiveThreads: () => void
   onRenameProject: (name: string) => void
@@ -27,7 +28,7 @@ interface ProjectItemProps {
 
 export const ProjectItem = memo(function ProjectItem({
   name, cwd, tasks, selectedTaskId, isDragOver,
-  onSelectTask, onNewThread, onDeleteTask, onRenameTask,
+  onSelectTask, onNewThread, onDeleteTask, onRenameTask, onForkTask,
   onRemoveProject, onArchiveThreads, onRenameProject,
   onDragStart, onDragOver, onDrop, onDragEnd,
 }: ProjectItemProps) {
@@ -179,6 +180,7 @@ export const ProjectItem = memo(function ProjectItem({
               onSelect={() => onSelectTask(task.id)}
               onDelete={() => onDeleteTask(task.id)}
               onRename={(n) => onRenameTask(task.id, n)}
+              onFork={() => onForkTask(task.id)}
             />
           ))}
         </ul>

@@ -1,5 +1,5 @@
 import { memo, useState, useRef, useCallback, useMemo, type ReactNode } from 'react'
-import { IconCopy, IconCheck, IconPhoto, IconFileText, IconFile, IconRobot, IconTool } from '@tabler/icons-react'
+import { IconCopy, IconCheck, IconPhoto, IconFileText, IconFile, IconRobot, IconTool, IconGitFork } from '@tabler/icons-react'
 import {
   Tooltip,
   TooltipContent,
@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/tooltip'
 import { CollapsedAnswers } from './CollapsedAnswers'
 import { useDiffStore } from '@/stores/diffStore'
+import { useTaskStore } from '@/stores/taskStore'
 import type { UserMessageRow as UserMessageRowData } from '@/lib/timeline'
 
 /** Match all @mentions: @agent:name, @skill:name, @file/paths */
@@ -108,6 +109,9 @@ const AttachmentPill = memo(function AttachmentPill({ name, type, src }: { name:
 })
 
 export const UserMessageRow = memo(function UserMessageRow({ row }: { row: UserMessageRowData }) {
+  const selectedTaskId = useTaskStore((s) => s.selectedTaskId)
+  const forkTask = useTaskStore((s) => s.forkTask)
+  const handleFork = useCallback(() => { if (selectedTaskId) void forkTask(selectedTaskId) }, [selectedTaskId, forkTask])
   const [copied, setCopied] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -170,6 +174,21 @@ export const UserMessageRow = memo(function UserMessageRow({ row }: { row: UserM
                 {copied ? 'Copied!' : 'Copy message'}
               </TooltipContent>
             </Tooltip>
+            {selectedTaskId && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleFork}
+                    aria-label="Fork thread from here"
+                    className="rounded-md p-0.5 text-muted-foreground/0 transition-all group-hover:text-muted-foreground/70 hover:!text-foreground"
+                  >
+                    <IconGitFork className="size-3" aria-hidden />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Fork thread</TooltipContent>
+              </Tooltip>
+            )}
             <span className="text-[11px] tabular-nums text-muted-foreground/60">
               {timeStr}
             </span>

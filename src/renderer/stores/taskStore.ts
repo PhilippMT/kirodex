@@ -4,6 +4,8 @@ import { ipc } from '@/lib/ipc'
 import { joinChunk } from '@/lib/utils'
 import * as historyStore from '@/lib/history-store'
 import { useDebugStore } from './debugStore'
+
+let _forkInProgress = false
 import { useSettingsStore } from './settingsStore'
 import { useDiffStore } from './diffStore'
 import { useKiroStore } from './kiroStore'
@@ -61,6 +63,7 @@ interface TaskStore {
   createDraftThread: (workspace: string) => string
   setPendingWorkspace: (workspace: string | null) => void
   renameTask: (taskId: string, name: string) => void
+  forkTask: (taskId: string) => Promise<void>
   projectNames: Record<string, string>
   renameProject: (workspace: string, name: string) => void
   reorderProject: (from: number, to: number) => void
@@ -376,6 +379,40 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       return { tasks: { ...state.tasks, [taskId]: { ...task, name } } }
     })
     get().persistHistory()
+  },
+
+  forkTask: async (taskId) => {
+    if (_forkInProgress) return
+    _forkInProgress = true
+    try {
+      const task = get().tasks[taskId]
+      const forked = await ipc.forkTask(taskId, task?.workspace, task?.name)
+      set((state) => {
+        const projects = forked.workspace && !state.projects.includes(forked.workspace)
+          ? [...state.projects, forked.workspace]
+          : state.projects
+        return {
+          tasks: { ...state.tasks, [forked.id]: forked },
+          selectedTaskId: forked.id,
+          view: 'chat' as const,
+          projects,
+        }
+      })
+      get().persistHistory()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      const { selectedTaskId, tasks, upsertTask } = get()
+      const tid = selectedTaskId ?? taskId
+      const task = tasks[tid]
+      if (task) {
+        upsertTask({
+          ...task,
+          messages: [...task.messages, { role: 'system', content: `⚠️ Fork failed: ${msg}`, timestamp: new Date().toISOString() }],
+        })
+      }
+    } finally {
+      _forkInProgress = false
+    }
   },
 
   renameProject: (workspace, name) => {

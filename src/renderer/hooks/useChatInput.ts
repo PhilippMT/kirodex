@@ -158,6 +158,7 @@ export function useChatInput({ disabled, isRunning, initialValue, onSendMessage,
       { name: 'usage', description: 'Show token and cost usage for this session' },
       { name: 'close', description: 'Close and delete the current thread' },
       { name: 'exit', description: 'Close and delete the current thread' },
+      { name: 'fork', description: 'Fork the current thread into a new session' },
     ]
     const names = new Set(backendCommands.map((c) => c.name.replace(/^\/+/, '')))
     return [...backendCommands, ...clientCommands.filter((c) => !names.has(c.name))]
