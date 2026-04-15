@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { IconX, IconMinus, IconArrowsDiagonal } from '@tabler/icons-react'
 import { cn } from '@/lib/utils'
 
 export const TrafficLights = () => {
@@ -24,7 +25,7 @@ export const TrafficLights = () => {
         onClick={() => void getCurrentWindow().close()}
         className="traffic-light traffic-light-close"
       >
-        <span className="symbol">×</span>
+        <span className="symbol"><IconX size={7} strokeWidth={3} color="rgba(0,0,0,0.5)" /></span>
       </button>
       <button
         type="button"
@@ -32,7 +33,7 @@ export const TrafficLights = () => {
         onClick={() => void getCurrentWindow().minimize()}
         className="traffic-light traffic-light-minimize"
       >
-        <span className="symbol">−</span>
+        <span className="symbol"><IconMinus size={7} strokeWidth={3} color="rgba(0,0,0,0.5)" /></span>
       </button>
       <button
         type="button"
@@ -40,7 +41,7 @@ export const TrafficLights = () => {
         onClick={() => void getCurrentWindow().isFullscreen().then(f => getCurrentWindow().setFullscreen(!f))}
         className="traffic-light traffic-light-maximize"
       >
-        <span className="symbol">⤢</span>
+        <span className="symbol"><IconArrowsDiagonal size={7} strokeWidth={2.5} color="rgba(0,0,0,0.5)" /></span>
       </button>
     </div>
   )

@@ -111,7 +111,7 @@ const AppHeaderInner = memo(function AppHeaderInner({ sidePanelOpen, onToggleSid
   const hasStats = diffStats.additions > 0 || diffStats.deletions > 0
 
   return (
-    <header data-testid="app-header" data-tauri-drag-region onMouseDown={handleHeaderMouseDown} className="flex h-[38px] shrink-0 items-center gap-3 border-b border-border bg-card px-4 pl-[76px] select-none [-webkit-user-select:none]">
+    <header data-testid="app-header" data-tauri-drag-region onMouseDown={handleHeaderMouseDown} className="flex h-[38px] shrink-0 items-center gap-3 border-b border-border bg-card p-0 pt-1 ml-[74px] select-none [-webkit-user-select:none]">
       {/* Breadcrumb left */}
       <nav data-testid="app-header-breadcrumb" data-tauri-drag-region className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
         {/* Toggle sidebar */}
@@ -429,7 +429,7 @@ const UserMenu = memo(function UserMenu() {
 })
 
 const HeaderFallback = () => (
-  <header data-tauri-drag-region className="drag-region flex h-[38px] shrink-0 items-center gap-3 border-b border-border bg-card px-4 pl-[76px]" />
+  <header data-tauri-drag-region className="drag-region flex h-[38px] shrink-0 items-center gap-3 border-b border-border bg-card p-0 pt-1 ml-[74px]" />
 )
 
 export function AppHeader(props: AppHeaderProps) {

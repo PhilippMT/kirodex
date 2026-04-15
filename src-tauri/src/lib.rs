@@ -94,6 +94,42 @@ fn shutdown_app(app: &tauri::AppHandle) {
     log::info!("Shutdown completed in {:?}", start.elapsed());
 }
 
+/// Re-position the macOS traffic light buttons (close, minimize, zoom) to match
+/// the custom `trafficLightPosition` from tauri.conf.json. macOS resets their
+/// position when the window gains or loses focus, so this must be called on
+/// every focus change to prevent them from being clipped by the content view's
+/// corner radius mask.
+#[cfg(target_os = "macos")]
+fn reposition_traffic_lights(ns_window: cocoa::base::id) {
+    use cocoa::appkit::{NSView, NSWindow, NSWindowButton};
+    use cocoa::foundation::NSRect;
+    const TRAFFIC_LIGHT_X: f64 = 13.0;
+    const TRAFFIC_LIGHT_Y: f64 = 13.0;
+    unsafe {
+        let close = ns_window.standardWindowButton_(NSWindowButton::NSWindowCloseButton);
+        let miniaturize = ns_window.standardWindowButton_(NSWindowButton::NSWindowMiniaturizeButton);
+        let zoom = ns_window.standardWindowButton_(NSWindowButton::NSWindowZoomButton);
+        if close.is_null() {
+            return;
+        }
+        let title_bar_container = close.superview().superview();
+        if title_bar_container.is_null() {
+            return;
+        }
+        let title_bar_frame: NSRect = NSView::frame(title_bar_container);
+        let close_rect: NSRect = NSView::frame(close);
+        let button_height = close_rect.size.height;
+        let vertical_offset = TRAFFIC_LIGHT_Y - (title_bar_frame.size.height - button_height) / 2.0;
+        let space_between = 20.0_f64;
+        for (i, button) in [close, miniaturize, zoom].iter().enumerate() {
+            let mut rect: NSRect = NSView::frame(*button);
+            rect.origin.x = TRAFFIC_LIGHT_X + (i as f64 * space_between);
+            rect.origin.y = (title_bar_frame.size.height - button_height) / 2.0 - vertical_offset;
+            button.setFrameOrigin(rect.origin);
+        }
+    }
+}
+
 pub fn run() {
     install_panic_hook();
 
@@ -135,13 +171,28 @@ pub fn run() {
                     let _: () = msg_send![layer, setCornerRadius: 12.0_f64];
                     let _: () = msg_send![layer, setMasksToBounds: true];
                 }
+                // Initial positioning of traffic lights
+                reposition_traffic_lights(ns_window);
             }
             log::info!("Kirodex started (pid={})", std::process::id());
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
-                shutdown_app(window.app_handle());
+            match event {
+                tauri::WindowEvent::CloseRequested { .. } => {
+                    shutdown_app(window.app_handle());
+                }
+                #[cfg(target_os = "macos")]
+                tauri::WindowEvent::Focused(_) => {
+                    // Re-position traffic lights on every focus/blur event.
+                    // macOS resets their position when the window resigns/becomes key,
+                    // causing them to be clipped by the content view's corner radius mask.
+                    #[allow(deprecated)]
+                    if let Ok(ns_window) = window.ns_window() {
+                        reposition_traffic_lights(ns_window as cocoa::base::id);
+                    }
+                }
+                _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![

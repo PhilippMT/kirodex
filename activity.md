@@ -1,5 +1,45 @@
 # Activity Log
 
+## 2026-04-16 02:29 GST (Dubai)
+
+### Window: fix macOS traffic lights disappearing on focus loss
+
+Added `reposition_traffic_lights()` function that re-positions the native close/minimize/zoom buttons using `standardWindowButton_` on every `Focused` window event. macOS resets their position when the window gains or loses key status, causing them to be clipped by the content view's corner radius mask (`setMasksToBounds: true`).
+
+**Modified:** `src-tauri/src/lib.rs`
+
+## 2026-04-16 02:28 GST (Dubai)
+
+### AppHeader: fine-tune vertical alignment with native macOS traffic lights
+
+Refined the header alignment by adding `pt-[6px]` and `box-content` back to the AppHeader. The previous change (removing all top padding) placed the header content too high — flush with the top of the window. With `trafficLightPosition: {x:13, y:13}`, the traffic lights start at y=13. Adding 6px of top padding pushes the header content area down so its top edge aligns with the traffic light top edge, creating a visually balanced layout. The total header height is now 44px (6px padding + 38px content).
+
+**Modified:** `src/renderer/components/AppHeader.tsx`
+
+## 2026-04-16 02:24 GST (Dubai)
+
+### AppHeader: align content vertically with native macOS traffic lights
+
+Removed `pt-[28px]` and `box-content` from the AppHeader and its fallback. The header was previously 66px total (38px content + 28px top padding), pushing header content well below the native macOS traffic lights. With `titleBarStyle: 'Overlay'` and `trafficLightPosition: {x:13, y:13}`, the traffic lights are centered at ~y=19. The 38px header (without top padding) centers its content at y=19, perfectly aligning with the traffic lights. The `pl-[76px]` left padding is kept to avoid horizontal overlap.
+
+**Modified:** `src/renderer/components/AppHeader.tsx`
+
+## 2026-04-16 02:21 GST (Dubai)
+
+### TrafficLights: improve CSS for more native macOS appearance
+
+Refined the traffic light button styles in `tailwind.css` for a more realistic macOS look. Switched from radial gradients to linear gradients (top-to-bottom), added inner highlight and shadow via `box-shadow` for a glass-like 3D effect, added subtle outer shadow for depth, improved the active state with an inset shadow, updated unfocused state colors for both light and dark mode, hid symbols when the window is unfocused, and added `line-height: 0` to the symbol span for better icon centering.
+
+**Modified:** `src/tailwind.css`
+
+## 2026-04-16 01:56 GST (Dubai)
+
+### AppHeader: replace native traffic lights with custom HTML controls
+
+Disabled native window decorations (`decorations: false` in tauri.conf.json) and integrated the existing `TrafficLights` component directly into `AppHeader` for macOS, replacing the `pl-[76px]` spacer. Added `WindowsControls` after `UserMenu` for Windows/Linux. Adjusted WindowsControls button height to match the 38px header. This eliminates the traffic light positioning inconsistency between dev and build modes.
+
+**Modified:** `src-tauri/tauri.conf.json`, `src/renderer/components/AppHeader.tsx`, `src/renderer/components/unified-title-bar/WindowsControls.tsx`
+
 ## 2026-04-16 01:34 GST (Dubai)
 
 ### Theme: change primary color from indigo to blue-500

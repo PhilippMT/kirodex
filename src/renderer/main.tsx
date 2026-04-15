@@ -91,6 +91,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 const splash = document.getElementById('splash')
 if (splash) {
   splash.style.opacity = '0'
-  splash.addEventListener('transitionend', () => splash.remove(), { once: true })
+  const handleRemove = () => splash.remove()
+  splash.addEventListener('transitionend', handleRemove, { once: true })
+  // If already invisible (transition already done), remove immediately
+  setTimeout(handleRemove, 500)
 }
 
