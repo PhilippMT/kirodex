@@ -1,6 +1,7 @@
 import {
   memo,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -13,11 +14,13 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { IconCheck, IconCopy } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
+import { HighlightText, SearchQueryContext } from "./HighlightText";
 import {
   QuestionCards,
 } from "./QuestionCards";
 import { hasQuestionBlocks, stripQuestionBlocks } from "@/lib/question-parser";
 import { useDiffStore } from "@/stores/diffStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 interface ChatMarkdownProps {
   text: string;
@@ -107,13 +110,33 @@ function stabilizeStreamingMarkdown(text: string): string {
 
 /** Single source of prose styling — all typography lives here, nothing in tailwind.css */
 const PROSE_CLASSES =
-  "chat-markdown w-full min-w-0 leading-[1.7] text-[15px] text-foreground";
+  "chat-markdown w-full min-w-0 leading-[1.7] text-foreground";
 
 /** Matches strings that look like file paths (contain / or \ and end with a file extension) */
 const FILE_PATH_RE = /^(?:\.{0,2}[\\/])?(?:[\w.@-]+[\\/])*[\w.@-]+\.\w{1,10}$/;
 
+/**
+ * Recursively walk ReactNode children and wrap every string leaf
+ * with HighlightText for search highlighting.
+ * Clones intermediate React elements so the highlight reaches
+ * text inside nested tags like strong, em, a, code, etc.
+ */
+function wrapChildrenWithHighlight(children: ReactNode): ReactNode {
+  return Children.map(children, (child) => {
+    if (typeof child === "string") return <HighlightText text={child} />;
+    if (isValidElement<{ children?: ReactNode }>(child) && child.props.children != null) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { children: nested, ...rest } = child.props;
+      return { ...child, props: { ...rest, children: wrapChildrenWithHighlight(nested) } };
+    }
+    return child;
+  });
+}
+
 function ChatMarkdown({ text, isStreaming = false }: ChatMarkdownProps) {
   const displayText = isStreaming ? stabilizeStreamingMarkdown(text) : text;
+  const searchQuery = useContext(SearchQueryContext);
+  const chatFontSize = useSettingsStore((s) => s.settings.fontSize ?? 14);
   const showQuestions = useMemo(
     () => !isStreaming && hasQuestionBlocks(displayText),
     [isStreaming, displayText],
@@ -125,12 +148,52 @@ function ChatMarkdown({ text, isStreaming = false }: ChatMarkdownProps) {
 
   const components = useMemo<Components>(
     () => ({
+      // Wrap string children in HighlightText for search highlighting
+      p({ node, children, ...props }) {
+        return <p {...props}>{wrapChildrenWithHighlight(children)}</p>;
+      },
+      li({ node, children, ...props }) {
+        return <li {...props}>{wrapChildrenWithHighlight(children)}</li>;
+      },
+      td({ node, children, ...props }) {
+        return <td {...props}>{wrapChildrenWithHighlight(children)}</td>;
+      },
+      th({ node, children, ...props }) {
+        return <th {...props}>{wrapChildrenWithHighlight(children)}</th>;
+      },
+      h1({ node, children, ...props }) {
+        return <h1 {...props}>{wrapChildrenWithHighlight(children)}</h1>;
+      },
+      h2({ node, children, ...props }) {
+        return <h2 {...props}>{wrapChildrenWithHighlight(children)}</h2>;
+      },
+      h3({ node, children, ...props }) {
+        return <h3 {...props}>{wrapChildrenWithHighlight(children)}</h3>;
+      },
+      h4({ node, children, ...props }) {
+        return <h4 {...props}>{wrapChildrenWithHighlight(children)}</h4>;
+      },
+      h5({ node, children, ...props }) {
+        return <h5 {...props}>{wrapChildrenWithHighlight(children)}</h5>;
+      },
+      h6({ node, children, ...props }) {
+        return <h6 {...props}>{wrapChildrenWithHighlight(children)}</h6>;
+      },
+      blockquote({ node, children, ...props }) {
+        return <blockquote {...props}>{wrapChildrenWithHighlight(children)}</blockquote>;
+      },
+      strong({ node, children, ...props }) {
+        return <strong {...props}>{wrapChildrenWithHighlight(children)}</strong>;
+      },
+      em({ node, children, ...props }) {
+        return <em {...props}>{wrapChildrenWithHighlight(children)}</em>;
+      },
       pre({ node, children, ...props }) {
         const block = extractCodeBlock(children);
         if (!block) return <pre {...props}>{children}</pre>;
         const lang = extractLanguage(block.className);
         return (
-          <div className="group relative my-3 overflow-hidden rounded-lg border border-border/50 bg-muted/50 dark:bg-[#0d1117]">
+          <div className="group relative my-3 overflow-hidden rounded-lg border border-border/50 bg-muted/50 dark:bg-muted/30">
             <div className="flex items-center justify-between border-b border-border/40 px-3.5 py-2">
               <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/50">
                 {lang}
@@ -190,11 +253,11 @@ function ChatMarkdown({ text, isStreaming = false }: ChatMarkdownProps) {
         );
       },
     }),
-    [],
+    [searchQuery],
   );
 
   return (
-    <div className={cn(PROSE_CLASSES, isStreaming && 'streaming-cursor')}>
+    <div className={cn(PROSE_CLASSES, isStreaming && 'streaming-cursor')} style={{ fontSize: chatFontSize }}>
       {showQuestions && <QuestionCards text={displayText} />}
       <ReactMarkdown remarkPlugins={remarkPlugins} components={components}>
         {markdownText}

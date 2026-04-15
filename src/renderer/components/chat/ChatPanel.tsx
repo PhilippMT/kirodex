@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { IconHistory } from '@tabler/icons-react'
 import { useTaskStore } from '@/stores/taskStore'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -9,8 +9,12 @@ import { PermissionBanner } from './PermissionBanner'
 import { ExecutionPlan } from './ExecutionPlan'
 import { TerminalDrawer } from './TerminalDrawer'
 import { QueuedMessages } from './QueuedMessages'
+import { SearchBar } from './SearchBar'
+import { SearchQueryContext } from './HighlightText'
+import { useMessageSearch } from '@/hooks/useMessageSearch'
 import { ipc } from '@/lib/ipc'
 import type { TaskMessage, ToolCall } from '@/types'
+import type { TimelineRow } from '@/lib/timeline'
 
 const EMPTY_MESSAGES: TaskMessage[] = []
 const EMPTY_TOOL_CALLS: ToolCall[] = []
@@ -20,7 +24,17 @@ const EMPTY_QUEUE: string[] = []
 /**
  * Owns the streaming selectors so ChatPanel doesn't re-render on every token.
  */
-const StreamingMessageList = memo(function StreamingMessageList({ isRunning }: { isRunning: boolean }) {
+const StreamingMessageList = memo(function StreamingMessageList({
+  isRunning,
+  searchMatchIds,
+  activeMatchId,
+  onTimelineRows,
+}: {
+  isRunning: boolean
+  searchMatchIds?: string[]
+  activeMatchId?: string | null
+  onTimelineRows?: (rows: TimelineRow[]) => void
+}) {
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId)
   const messages = useTaskStore((s) => selectedTaskId ? s.tasks[selectedTaskId]?.messages ?? EMPTY_MESSAGES : EMPTY_MESSAGES)
   const streamingChunk = useTaskStore((s) => selectedTaskId ? s.streamingChunks[selectedTaskId] ?? '' : '')
@@ -34,6 +48,9 @@ const StreamingMessageList = memo(function StreamingMessageList({ isRunning }: {
       liveToolCalls={liveToolCalls}
       liveThinking={liveThinking}
       isRunning={isRunning}
+      searchMatchIds={searchMatchIds}
+      activeMatchId={activeMatchId}
+      onTimelineRows={onTimelineRows}
     />
   )
 })
@@ -79,7 +96,7 @@ const ArchivedBanner = memo(function ArchivedBanner() {
       {/* Label */}
       <div className="flex shrink-0 items-center gap-1.5 mx-3 rounded-full border border-blue-400/20 bg-card px-3 py-1">
         <IconHistory className="size-3 text-blue-400/50" />
-        <span className="text-[11px] font-medium text-blue-300/50">Previous conversation — view only</span>
+        <span className="text-[11px] font-medium text-blue-500/60 dark:text-blue-300/50">Previous conversation — view only</span>
       </div>
       {/* Zigzag line right */}
       <svg className="flex-1 h-3 text-blue-400/30" preserveAspectRatio="none" viewBox="0 0 120 12">
@@ -100,6 +117,44 @@ export const ChatPanel = memo(function ChatPanel() {
   const messageCount = useTaskStore((s) => selectedTaskId ? s.tasks[selectedTaskId]?.messages?.length ?? 0 : 0)
   const terminalOpen = useTaskStore((s) => selectedTaskId ? s.terminalOpenTasks.has(selectedTaskId) : false)
   const queuedMessages = useTaskStore((s) => selectedTaskId ? s.queuedMessages[selectedTaskId] ?? EMPTY_QUEUE : EMPTY_QUEUE)
+
+  // Search state — timeline rows are pushed up from MessageList via callback
+  const timelineRowsRef = useRef<TimelineRow[]>([])
+  const [timelineRows, setTimelineRows] = useState<TimelineRow[]>([])
+  const handleTimelineRows = useCallback((rows: TimelineRow[]) => {
+    // Only update state when the row array identity changes (memo'd in MessageList)
+    if (rows !== timelineRowsRef.current) {
+      timelineRowsRef.current = rows
+      setTimelineRows(rows)
+    }
+  }, [])
+
+  const search = useMessageSearch(timelineRows)
+
+  // Close search when switching threads
+  const prevTaskIdRef = useRef(selectedTaskId)
+  useEffect(() => {
+    if (prevTaskIdRef.current !== selectedTaskId && search.isOpen) {
+      search.close()
+    }
+    prevTaskIdRef.current = selectedTaskId
+  }, [selectedTaskId, search])
+
+  // Cmd+F / Ctrl+F shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault()
+        if (search.isOpen) {
+          search.close()
+        } else {
+          search.open()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [search])
 
   const handleSendMessage = useCallback(async (msg: string) => {
     const state = useTaskStore.getState()
@@ -170,6 +225,8 @@ export const ChatPanel = memo(function ChatPanel() {
   const isRunning = taskStatus === 'running'
   const inputDisabled = isArchived || taskStatus === 'cancelled'
 
+  const searchQuery = search.isOpen ? search.query : ''
+
   return (
     <div data-testid="chat-panel" className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -179,7 +236,28 @@ export const ChatPanel = memo(function ChatPanel() {
           </div>
         )}
 
-        <StreamingMessageList isRunning={isRunning} />
+        {search.isOpen && (
+          <div className="shrink-0">
+            <SearchBar
+              query={search.query}
+              matchCount={search.matchCount}
+              activeIndex={search.activeIndex}
+              onQueryChange={search.setQuery}
+              onNext={search.goToNext}
+              onPrevious={search.goToPrevious}
+              onClose={search.close}
+            />
+          </div>
+        )}
+
+        <SearchQueryContext.Provider value={searchQuery}>
+          <StreamingMessageList
+            isRunning={isRunning}
+            searchMatchIds={search.isOpen ? search.matchIds : undefined}
+            activeMatchId={search.isOpen ? search.activeMatchId : undefined}
+            onTimelineRows={handleTimelineRows}
+          />
+        </SearchQueryContext.Provider>
 
         {isArchived && <ArchivedBanner />}
 

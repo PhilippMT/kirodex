@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { IconArrowDown } from '@tabler/icons-react'
 import type { TaskMessage, ToolCall } from '@/types'
 import { deriveTimeline, type TimelineRow } from '@/lib/timeline'
+import { cn } from '@/lib/utils'
 import {
   UserMessageRow,
   SystemMessageRow,
@@ -19,6 +20,12 @@ interface MessageListProps {
   liveToolCalls?: ToolCall[]
   liveThinking?: string
   isRunning?: boolean
+  /** IDs of timeline rows that match the current search query */
+  searchMatchIds?: string[]
+  /** ID of the currently active (focused) search match */
+  activeMatchId?: string | null
+  /** Callback to expose derived timeline rows to the parent */
+  onTimelineRows?: (rows: TimelineRow[]) => void
 }
 
 export const MessageList = memo(function MessageList({
@@ -27,6 +34,9 @@ export const MessageList = memo(function MessageList({
   liveToolCalls,
   liveThinking,
   isRunning,
+  searchMatchIds,
+  activeMatchId,
+  onTimelineRows,
 }: MessageListProps) {
   const parentRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -36,6 +46,16 @@ export const MessageList = memo(function MessageList({
   const timelineRows = useMemo(
     () => deriveTimeline(messages, streamingChunk, liveToolCalls, liveThinking, isRunning),
     [messages, streamingChunk, liveToolCalls, liveThinking, isRunning],
+  )
+
+  // Expose timeline rows to parent for search
+  useEffect(() => {
+    onTimelineRows?.(timelineRows)
+  }, [timelineRows, onTimelineRows])
+
+  const matchIdSet = useMemo(
+    () => (searchMatchIds ? new Set(searchMatchIds) : null),
+    [searchMatchIds],
   )
 
   const scrollToBottom = useCallback(() => {
@@ -62,6 +82,13 @@ export const MessageList = memo(function MessageList({
     }
   }, [timelineRows, streamingChunk, liveToolCalls, liveThinking, scrollToBottom])
 
+  // Scroll to the active search match
+  useEffect(() => {
+    if (!activeMatchId || !parentRef.current) return
+    const el = parentRef.current.querySelector(`[data-row-id="${activeMatchId}"]`)
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [activeMatchId])
+
   if (!timelineRows.length) {
     return (
       <div className="flex flex-1 items-center justify-center text-muted-foreground">
@@ -73,13 +100,26 @@ export const MessageList = memo(function MessageList({
   return (
     <div className="relative min-h-0 flex-1">
       <div ref={parentRef} data-testid="message-list" className="h-full overflow-auto overscroll-y-contain px-0 pt-4 pb-6 sm:pt-6 sm:pb-8">
-        {timelineRows.map((row) => (
-          <div key={row.id} data-timeline-row-kind={row.kind}>
-            <div className="mx-auto w-full min-w-0 max-w-3xl overflow-x-auto overflow-y-hidden px-5 sm:px-8 lg:max-w-4xl xl:max-w-5xl">
-              <TimelineRowRenderer row={row} />
+        {timelineRows.map((row) => {
+          const isMatch = matchIdSet?.has(row.id) ?? false
+          const isActive = row.id === activeMatchId
+          return (
+            <div
+              key={row.id}
+              data-timeline-row-kind={row.kind}
+              data-row-id={row.id}
+              className={cn(
+                'transition-colors duration-200',
+                isActive && 'bg-primary/10',
+                isMatch && !isActive && 'bg-primary/5',
+              )}
+            >
+              <div className="mx-auto w-full min-w-0 max-w-3xl overflow-x-auto overflow-y-hidden px-5 sm:px-8 lg:max-w-4xl xl:max-w-5xl">
+                <TimelineRowRenderer row={row} />
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
         <div ref={bottomRef} />
       </div>
 
