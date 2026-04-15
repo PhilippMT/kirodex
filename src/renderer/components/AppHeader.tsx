@@ -54,10 +54,21 @@ const AppHeaderInner = memo(function AppHeaderInner({ sidePanelOpen, onToggleSid
   const pendingWorkspace = useTaskStore((s) => s.pendingWorkspace)
   const terminalOpen = useTaskStore((s) => selectedTaskId ? s.terminalOpenTasks.has(selectedTaskId) : false)
   const toggleTerminal = useTaskStore((s) => s.toggleTerminal)
+  const renameTask = useTaskStore((s) => s.renameTask)
+  const renameProject = useTaskStore((s) => s.renameProject)
+  const projectNames = useTaskStore((s) => s.projectNames)
 
   // Workspace-level diff stats (reactive to workspace changes)
   const workspace = taskWorkspace ?? pendingWorkspace
   const [diffStats, setDiffStats] = useState({ additions: 0, deletions: 0, fileCount: 0 })
+
+  // Inline rename state for breadcrumbs
+  const [editingProject, setEditingProject] = useState(false)
+  const [editingThread, setEditingThread] = useState(false)
+  const [projectEditValue, setProjectEditValue] = useState('')
+  const [threadEditValue, setThreadEditValue] = useState('')
+  const projectInputRef = useRef<HTMLInputElement>(null)
+  const threadInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!workspace) { setDiffStats({ additions: 0, deletions: 0, fileCount: 0 }); return }
@@ -77,7 +88,35 @@ const AppHeaderInner = memo(function AppHeaderInner({ sidePanelOpen, onToggleSid
   const handleFork = useCallback(() => { if (selectedTaskId && !isForking) void forkTask(selectedTaskId) }, [selectedTaskId, forkTask, isForking])
 
   // Show workspace from task or from pendingWorkspace (before first message)
-  const projectName = workspace?.split('/').pop() ?? null
+  const projectName = (workspace ? (projectNames[workspace] ?? workspace.split('/').pop()) : null) ?? null
+
+  // Focus input when entering edit mode
+  useEffect(() => { if (editingProject) projectInputRef.current?.select() }, [editingProject])
+  useEffect(() => { if (editingThread) threadInputRef.current?.select() }, [editingThread])
+
+  const handleProjectDoubleClick = useCallback(() => {
+    if (!workspace) return
+    setProjectEditValue(projectName ?? '')
+    setEditingProject(true)
+  }, [workspace, projectName])
+
+  const commitProjectRename = useCallback(() => {
+    const trimmed = projectEditValue.trim()
+    if (workspace && trimmed && trimmed !== projectName) renameProject(workspace, trimmed)
+    setEditingProject(false)
+  }, [projectEditValue, projectName, workspace, renameProject])
+
+  const handleThreadDoubleClick = useCallback(() => {
+    if (!selectedTaskId || !taskName) return
+    setThreadEditValue(taskName)
+    setEditingThread(true)
+  }, [selectedTaskId, taskName])
+
+  const commitThreadRename = useCallback(() => {
+    const trimmed = threadEditValue.trim()
+    if (selectedTaskId && trimmed && trimmed !== taskName) renameTask(selectedTaskId, trimmed)
+    setEditingThread(false)
+  }, [threadEditValue, taskName, selectedTaskId, renameTask])
   const canPause = taskStatus === 'running'
   const canResume = taskStatus === 'paused' && !!taskUserPaused
   const canCancel = taskStatus === 'running' || (taskStatus === 'paused' && !!taskUserPaused)
@@ -111,9 +150,30 @@ const AppHeaderInner = memo(function AppHeaderInner({ sidePanelOpen, onToggleSid
         {projectName ? (
           <>
             <Sep />
-            <span data-tauri-drag-region className="min-w-0 max-w-[160px] truncate text-[13px] text-muted-foreground" title={workspace ?? undefined}>
-              {projectName}
-            </span>
+            {editingProject ? (
+              <input
+                ref={projectInputRef}
+                data-no-drag
+                value={projectEditValue}
+                onChange={(e) => setProjectEditValue(e.target.value)}
+                onBlur={commitProjectRename}
+                onKeyDown={(e) => { if (e.key === 'Enter') commitProjectRename(); if (e.key === 'Escape') setEditingProject(false) }}
+                className="min-w-0 max-w-[160px] truncate rounded-sm bg-transparent px-0.5 text-[13px] text-muted-foreground outline-none ring-1 ring-ring"
+              />
+            ) : (
+              <span
+                data-no-drag
+                role="button"
+                tabIndex={0}
+                aria-label={`Rename project ${projectName}`}
+                onDoubleClick={handleProjectDoubleClick}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'F2') handleProjectDoubleClick() }}
+                className="min-w-0 max-w-[160px] cursor-default truncate rounded-sm text-[13px] text-muted-foreground hover:text-foreground hover:bg-accent/50 px-0.5 transition-colors"
+                title={workspace ?? undefined}
+              >
+                {projectName}
+              </span>
+            )}
           </>
         ) : (
           <>
@@ -126,9 +186,30 @@ const AppHeaderInner = memo(function AppHeaderInner({ sidePanelOpen, onToggleSid
         {taskName ? (
           <>
             <Sep />
-            <span data-tauri-drag-region className="min-w-0 max-w-[200px] truncate text-[13px] font-medium text-foreground" title={taskName}>
-              {taskName}
-            </span>
+            {editingThread ? (
+              <input
+                ref={threadInputRef}
+                data-no-drag
+                value={threadEditValue}
+                onChange={(e) => setThreadEditValue(e.target.value)}
+                onBlur={commitThreadRename}
+                onKeyDown={(e) => { if (e.key === 'Enter') commitThreadRename(); if (e.key === 'Escape') setEditingThread(false) }}
+                className="min-w-0 max-w-[200px] truncate rounded-sm bg-transparent px-0.5 text-[13px] font-medium text-foreground outline-none ring-1 ring-ring"
+              />
+            ) : (
+              <span
+                data-no-drag
+                role="button"
+                tabIndex={0}
+                aria-label={`Rename thread ${taskName}`}
+                onDoubleClick={handleThreadDoubleClick}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'F2') handleThreadDoubleClick() }}
+                className="min-w-0 max-w-[200px] cursor-default truncate rounded-sm text-[13px] font-medium text-foreground hover:bg-accent/50 px-0.5 transition-colors"
+                title={taskName}
+              >
+                {taskName}
+              </span>
+            )}
           </>
         ) : pendingWorkspace ? (
           <>

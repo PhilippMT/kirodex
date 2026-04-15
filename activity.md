@@ -1,5 +1,13 @@
 # Activity Log
 
+## 2026-04-15 12:53 GST (Dubai)
+
+### AppHeader: Inline rename for project and thread breadcrumbs
+
+Added inline rename to the AppHeader breadcrumb. Double-click (or Enter/F2) on the project name or thread name triggers an editable input. Escape cancels, Enter or blur commits. Uses the existing `renameTask` and `renameProject` store actions. Also fixed project display name to use `projectNames` store instead of always falling back to the folder name.
+
+**Modified:** src/renderer/components/AppHeader.tsx
+
 ## 2026-04-15 12:31 GST (Dubai)
 
 ### Commits: Review and split unstaged changes into 4 logical commits
