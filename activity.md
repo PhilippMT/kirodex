@@ -1,3 +1,11 @@
+## 2026-04-15 11:50 GST (Dubai)
+
+### Git: Split 60-file staging area into 9 logical conventional commits
+
+Split a single large staging area (60 files, ~3,000 lines) into 9 focused commits: theme system, message search, notifications rewrite, onboarding redesign, model icons, completion report card, async task_fork fix, UI polish/font sizing, and docs/screenshots refresh.
+
+**Modified:** All 60 previously staged files across 9 commits on main
+
 ## 2026-04-15 11:40 GST (Dubai)
 
 ### Sidebar: Soft-delete threads with 2-day retention and Recently Deleted section
