@@ -14,6 +14,7 @@ import { PlanToggle } from './PlanToggle'
 import { AutoApproveToggle } from './AutoApproveToggle'
 import { useChatInput } from '@/hooks/useChatInput'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useTaskStore } from '@/stores/taskStore'
 import type { PastedChunk } from '@/hooks/useChatInput'
 import type { Attachment, ProjectFile } from '@/types'
 
@@ -131,9 +132,10 @@ interface ChatInputProps {
   workspace?: string | null
   isCollapsed?: boolean
   onToggleCollapse?: () => void
+  isWorktree?: boolean
 }
 
-export const ChatInput = memo(function ChatInput({ disabled, disabledReason, contextUsage, messageCount = 0, isRunning, initialValue, autoFocus, hasQueuedMessages, onSendMessage, onPause, onDraftChange, workspace, isCollapsed, onToggleCollapse }: ChatInputProps) {
+export const ChatInput = memo(function ChatInput({ disabled, disabledReason, contextUsage, messageCount = 0, isRunning, initialValue, autoFocus, hasQueuedMessages, onSendMessage, onPause, onDraftChange, workspace, isCollapsed, onToggleCollapse, isWorktree }: ChatInputProps) {
   const {
     value, setValue, textareaRef, canSend,
     slashIndex, slashQuery, commands, filteredCmds, showPicker,
@@ -147,6 +149,7 @@ export const ChatInput = memo(function ChatInput({ disabled, disabledReason, con
   } = useChatInput({ disabled, isRunning, initialValue, onSendMessage, onPause, onDraftChange })
 
   const currentModeId = useSettingsStore((s) => s.currentModeId)
+  const compactionStatus = useTaskStore((s) => s.selectedTaskId ? s.tasks[s.selectedTaskId]?.compactionStatus : undefined)
 
   const imageAttachments = useMemo(() => attachments.filter((a) => a.type === 'image' && a.preview), [attachments])
   const nonImageAttachments = useMemo(() => attachments.filter((a) => a.type !== 'image' || !a.preview), [attachments])
@@ -217,7 +220,7 @@ export const ChatInput = memo(function ChatInput({ disabled, disabledReason, con
   const buttonBg = isPlanMode ? 'bg-teal-500/90 hover:bg-teal-500' : 'bg-blue-500/90 hover:bg-blue-500'
 
   const contextRingNode = (contextUsage && contextUsage.size > 0)
-    ? <ContextRing used={contextUsage.used} size={contextUsage.size} />
+    ? <ContextRing used={contextUsage.used} size={contextUsage.size} compactionStatus={compactionStatus} />
     : messageCount > 0
       ? <ContextRing used={Math.min(messageCount * 3, 95)} size={100} />
       : null
@@ -392,7 +395,7 @@ export const ChatInput = memo(function ChatInput({ disabled, disabledReason, con
             {/* Right: git + context + send/pause */}
             <div className="flex shrink-0 items-center gap-1.5">
               <div className="flex min-w-0 items-center gap-1.5">
-                <BranchSelector workspace={workspace ?? null} />
+                <BranchSelector workspace={workspace ?? null} isWorktree={isWorktree} />
               </div>
               <input
                 ref={fileInputRef}

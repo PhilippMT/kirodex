@@ -42,6 +42,8 @@ interface TaskStore {
   taskModes: Record<string, string>
   /** Whether a fork operation is in progress */
   isForking: boolean
+  /** Pending worktree cleanup — set when a worktree thread has uncommitted changes */
+  worktreeCleanupPending: { taskId: string; worktreePath: string; originalWorkspace: string; action: 'archive' | 'delete' } | null
   setSelectedTask: (id: string | null) => void
   setView: (view: 'chat' | 'dashboard') => void
   setNewProjectOpen: (open: boolean) => void
@@ -61,6 +63,7 @@ interface TaskStore {
   upsertToolCall: (taskId: string, toolCall: ToolCall) => void
   updatePlan: (taskId: string, plan: PlanStep[]) => void
   updateUsage: (taskId: string, used: number, size: number) => void
+  updateCompactionStatus: (taskId: string, status: import('@/types').CompactionStatus, summary?: string) => void
   clearTurn: (taskId: string) => void
   enqueueMessage: (taskId: string, message: string) => void
   dequeueMessages: (taskId: string) => string[]
@@ -81,6 +84,7 @@ interface TaskStore {
   setConnected: (v: boolean) => void
   persistHistory: () => void
   clearHistory: () => Promise<void>
+  resolveWorktreeCleanup: (remove: boolean) => void
 }
 
 export const useTaskStore = create<TaskStore>((set, get) => ({
@@ -107,6 +111,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   notifiedTaskIds: [],
   taskModes: {},
   isForking: false,
+  worktreeCleanupPending: null,
 
   setSelectedTask: (id) => {
     if (get().selectedTaskId === id) return
@@ -249,6 +254,16 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   archiveTask: (id) => {
     const task = get().tasks[id]
     if (!task || task.isArchived) return
+    // Check for worktree cleanup
+    if (task.worktreePath && task.originalWorkspace) {
+      void ipc.gitWorktreeHasChanges(task.worktreePath).then((hasChanges) => {
+        if (hasChanges) {
+          set({ worktreeCleanupPending: { taskId: id, worktreePath: task.worktreePath!, originalWorkspace: task.originalWorkspace!, action: 'archive' } })
+        } else {
+          void ipc.gitWorktreeRemove(task.originalWorkspace!, task.worktreePath!).catch(() => {})
+        }
+      }).catch(() => {})
+    }
     void ipc.cancelTask(id).catch(() => {})
     set((s) => ({
       tasks: { ...s.tasks, [id]: { ...s.tasks[id], isArchived: true, status: 'completed' } },
@@ -263,6 +278,16 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   softDeleteTask: (id) => {
     const task = get().tasks[id]
     if (!task) return
+    // Check for worktree cleanup
+    if (task.worktreePath && task.originalWorkspace) {
+      void ipc.gitWorktreeHasChanges(task.worktreePath).then((hasChanges) => {
+        if (hasChanges) {
+          set({ worktreeCleanupPending: { taskId: id, worktreePath: task.worktreePath!, originalWorkspace: task.originalWorkspace!, action: 'delete' } })
+        } else {
+          void ipc.gitWorktreeRemove(task.originalWorkspace!, task.worktreePath!).catch(() => {})
+        }
+      }).catch(() => {})
+    }
     void ipc.cancelTask(id).catch(() => {})
     void ipc.deleteTask(id)
     set((state) => {
@@ -388,8 +413,51 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       if (!task) return state
       const cu = task.contextUsage
       if (cu && cu.used === used && cu.size === size) return state
+      // Reset compaction status to idle when new usage arrives post-compaction
+      const resetCompaction = task.compactionStatus === 'completed' || task.compactionStatus === 'failed'
       return {
-        tasks: { ...state.tasks, [taskId]: { ...task, contextUsage: { used, size } } },
+        tasks: { ...state.tasks, [taskId]: { ...task, contextUsage: { used, size }, ...(resetCompaction ? { compactionStatus: 'idle' as const } : {}) } },
+      }
+    }),
+
+  updateCompactionStatus: (taskId, status, summary) =>
+    set((state) => {
+      const task = state.tasks[taskId]
+      if (!task) return state
+      if (task.compactionStatus === status) return state
+      const messages = [...task.messages]
+      if (status === 'compacting') {
+        // Inject plan text so the backend summary includes it
+        if (task.plan && task.plan.length > 0) {
+          const planText = task.plan.map((s, i) => `${i + 1}. [${s.status}] ${s.content}`).join('\n')
+          messages.push({
+            role: 'system' as const,
+            content: `⏳ Compacting context...\n\n**Plan to preserve:**\n${planText}`,
+            timestamp: new Date().toISOString(),
+          })
+        } else {
+          messages.push({
+            role: 'system' as const,
+            content: '⏳ Compacting context...',
+            timestamp: new Date().toISOString(),
+          })
+        }
+      } else if (status === 'completed') {
+        const hasPlan = task.plan && task.plan.length > 0
+        messages.push({
+          role: 'system' as const,
+          content: hasPlan ? '✅ Context compacted — plan preserved' : '✅ Context compacted',
+          timestamp: new Date().toISOString(),
+        })
+      } else if (status === 'failed') {
+        messages.push({
+          role: 'system' as const,
+          content: '⚠️ Context compaction failed',
+          timestamp: new Date().toISOString(),
+        })
+      }
+      return {
+        tasks: { ...state.tasks, [taskId]: { ...task, compactionStatus: status, messages } },
       }
     }),
 
@@ -490,6 +558,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     try {
       const task = get().tasks[taskId]
       const forked = await ipc.forkTask(taskId, task?.workspace, task?.name)
+      forked.parentTaskId = taskId
       set((state) => {
         const projects = forked.workspace && !state.projects.includes(forked.workspace)
           ? [...state.projects, forked.workspace]
@@ -683,6 +752,15 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     const defaultSettings = { ...useSettingsStore.getState().settings, hasOnboardedV2: false, projectPrefs: {} }
     await useSettingsStore.getState().saveSettings(defaultSettings)
     useSettingsStore.setState({ settings: defaultSettings })
+  },
+
+  resolveWorktreeCleanup: (remove) => {
+    const pending = get().worktreeCleanupPending
+    if (!pending) return
+    if (remove) {
+      void ipc.gitWorktreeRemove(pending.originalWorkspace, pending.worktreePath).catch(() => {})
+    }
+    set({ worktreeCleanupPending: null })
   },
 }))
 
@@ -963,8 +1041,19 @@ export function initTaskListeners(): () => void {
     }
   })
 
+  const unsub13 = ipc.onCompactionStatus(({ taskId, status }) => {
+    const mapped = status === 'started' ? 'compacting'
+      : status === 'completed' ? 'completed'
+      : status === 'failed' ? 'failed'
+      : null
+    if (mapped) {
+      useTaskStore.getState().updateCompactionStatus(taskId, mapped as import('@/types').CompactionStatus)
+    }
+  })
+
   return () => {
     unsub1(); unsub2(); unsub3(); unsub4(); unsub5()
     unsub6(); unsub7(); unsub8(); unsub9(); unsub10(); unsub11(); unsub12()
+    unsub13()
   }
 }

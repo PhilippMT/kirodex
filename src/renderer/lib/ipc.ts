@@ -89,6 +89,14 @@ export const ipc = {
     invoke('git_staged_stats', { cwd }),
   gitRemoteUrl: (cwd: string): Promise<string> =>
     invoke('git_remote_url', { cwd }),
+  gitWorktreeCreate: (cwd: string, slug: string): Promise<{ worktreePath: string; branch: string }> =>
+    invoke('git_worktree_create', { cwd, slug }),
+  gitWorktreeRemove: (cwd: string, worktreePath: string): Promise<void> =>
+    invoke('git_worktree_remove', { cwd, worktreePath }),
+  gitWorktreeSetup: (cwd: string, worktreePath: string, symlinkDirs: string[]): Promise<{ symlinkCount: number; copiedFiles: string[] }> =>
+    invoke('git_worktree_setup', { cwd, worktreePath, symlinkDirs }),
+  gitWorktreeHasChanges: (worktreePath: string): Promise<boolean> =>
+    invoke('git_worktree_has_changes', { worktreePath }),
   openInEditor: (path: string, editor: string): Promise<void> =>
     invoke('open_in_editor', { path, editor }),
   detectEditors: (): Promise<string[]> =>
@@ -167,4 +175,6 @@ export const ipc = {
     tauriListen('task_error', cb),
   onSubagentUpdate: (cb: (data: { taskId: string; subagents: unknown[]; pendingStages: unknown[] }) => void): UnsubscribeFn =>
     tauriListen('subagent_update', cb),
+  onCompactionStatus: (cb: (data: { taskId: string; status: string; summary: unknown }) => void): UnsubscribeFn =>
+    tauriListen('compaction_status', cb),
 }

@@ -57,6 +57,8 @@ export interface TaskMessage {
 
 // ── Task ──────────────────────────────────────────────────────────
 
+export type CompactionStatus = 'idle' | 'compacting' | 'completed' | 'failed'
+
 export interface AgentTask {
   id: string
   name: string
@@ -78,6 +80,8 @@ export interface AgentTask {
   plan?: PlanStep[]
   /** Context usage: used / size */
   contextUsage?: { used: number; size: number } | null
+  /** Current compaction status */
+  compactionStatus?: CompactionStatus
   agentProfileId?: string
   /** True only when the user explicitly hit Pause mid-run (not draft/idle) */
   userPaused?: boolean
@@ -85,6 +89,10 @@ export interface AgentTask {
   parentTaskId?: string
   /** True for threads restored from persisted history (read-only) */
   isArchived?: boolean
+  /** Path to the git worktree directory, if this thread uses one */
+  worktreePath?: string
+  /** Original workspace path before worktree was created */
+  originalWorkspace?: string
 }
 
 // ── Soft-deleted threads ──────────────────────────────────────────
@@ -114,6 +122,8 @@ export interface ActivityEntry {
 export interface ProjectPrefs {
   modelId?: string | null
   autoApprove?: boolean
+  worktreeEnabled?: boolean
+  symlinkDirectories?: string[]
 }
 
 export type SidebarPosition = 'left' | 'right'

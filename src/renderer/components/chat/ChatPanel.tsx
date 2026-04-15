@@ -7,6 +7,7 @@ import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import { PermissionBanner } from './PermissionBanner'
 import { ExecutionPlan } from './ExecutionPlan'
+import { CompactSuggestBanner } from './CompactSuggestBanner'
 import { TerminalDrawer } from './TerminalDrawer'
 import { QueuedMessages } from './QueuedMessages'
 import { SearchBar } from './SearchBar'
@@ -113,7 +114,9 @@ export const ChatPanel = memo(function ChatPanel() {
   const taskPlan = useTaskStore((s) => selectedTaskId ? s.tasks[selectedTaskId]?.plan : null)
   const pendingPermission = useTaskStore((s) => selectedTaskId ? s.tasks[selectedTaskId]?.pendingPermission : null)
   const contextUsage = useTaskStore((s) => selectedTaskId ? s.tasks[selectedTaskId]?.contextUsage : null)
+  const isPlanMode = useSettingsStore((s) => s.currentModeId === 'kiro_planner')
   const taskWorkspace = useTaskStore((s) => selectedTaskId ? s.tasks[selectedTaskId]?.workspace : null)
+  const isWorktree = useTaskStore((s) => selectedTaskId ? !!s.tasks[selectedTaskId]?.worktreePath : false)
   const messageCount = useTaskStore((s) => selectedTaskId ? s.tasks[selectedTaskId]?.messages?.length ?? 0 : 0)
   const terminalOpen = useTaskStore((s) => selectedTaskId ? s.terminalOpenTasks.has(selectedTaskId) : false)
   const queuedMessages = useTaskStore((s) => selectedTaskId ? s.queuedMessages[selectedTaskId] ?? EMPTY_QUEUE : EMPTY_QUEUE)
@@ -272,6 +275,10 @@ export const ChatPanel = memo(function ChatPanel() {
         )}
 
         {!isArchived && (
+          <CompactSuggestBanner contextUsage={contextUsage} isPlanMode={isPlanMode} />
+        )}
+
+        {!isArchived && (
           <QueuedMessages messages={queuedMessages} onRemove={handleRemoveQueued} onReorder={handleReorderQueued} onSteer={isRunning ? handleSteer : undefined} />
         )}
 
@@ -294,6 +301,7 @@ export const ChatPanel = memo(function ChatPanel() {
             onSendMessage={handleSendMessage}
             onPause={handlePause}
             workspace={taskWorkspace}
+            isWorktree={isWorktree}
             isCollapsed={isInputCollapsed}
             onToggleCollapse={handleToggleCollapse}
           />

@@ -92,6 +92,7 @@ chmod +x Kirodex_*.AppImage && ./Kirodex_*.AppImage
 - Slash commands (`/clear`, `/close`, `/model`, `/agent`, `/plan`, `/chat`) with fuzzy search across all pickers
 - Agent mention pills (`@agent`) with built-in agents, styled icons, and fuzzy matching
 - Plan mode with per-thread state and a handoff card to start building after planning
+- Context-aware plan handoff — when context usage grows past 30% in plan mode, a suggestion banner appears to switch to implement mode before the context window fills up; the plan is preserved across compaction so the coding agent picks up where the planner left off
 - Thread archiving — `/close` preserves conversation history in a read-only view instead of deleting
 - Task management: create, pause, resume, cancel, delete
 - Question cards — agents can ask multi-choice questions; pick an option and reply inline
