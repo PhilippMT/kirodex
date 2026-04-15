@@ -123,8 +123,8 @@ jobs:
 
             **Homebrew:**
             ```bash
-            brew install --cask thabti/tap/kirodex   # first install
-            brew reinstall --cask thabti/tap/kirodex  # upgrade
+            brew install --cask thabti/tap/kirodex        # first install
+            brew update && brew reinstall kirodex       # upgrade
             ```
 
             > Requires [kiro-cli](https://kiro.dev)

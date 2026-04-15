@@ -21,7 +21,7 @@
 <body>
 
   <!-- ── Nav ─────────────────────────────────────────────────── -->
-  <nav id="nav" class="fixed top-0 left-0 right-0 z-50 border-b border-[rgba(255,255,255,0.06)] bg-[#16161c]/80 backdrop-blur-md">
+  <nav id="nav" class="fixed top-0 left-0 right-0 z-50 border-b border-[rgba(255,255,255,0.06)] bg-[#1c1c24]/80 backdrop-blur-md">
     <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
       <a href="#" class="flex items-center gap-3 text-[17px] font-semibold text-foreground no-underline">
         <img src="assets/icon.svg" alt="" width="28" height="28" class="rounded-lg">
@@ -42,9 +42,30 @@
     <img src="assets/icon.svg" alt="Kirodex icon" width="72" height="72" class="mb-6 rounded-2xl shadow-lg shadow-[#0000FF]/20">
     <h1 class="mb-4 text-5xl font-bold tracking-tight text-foreground sm:text-6xl">Kirodex</h1>
     <p class="mb-6 max-w-xl text-xl leading-relaxed text-muted-foreground">AI coding agents on your desktop. Chat, plan, diff, commit — all from one native app.</p>
-    <p class="mb-10 max-w-md text-[16px] leading-relaxed text-muted-foreground/60">
-      Built with Tauri v2 and React 19. Powered by the Agent Client Protocol.
-      Works with macOS, Linux, and Windows.
+
+    <!-- Performance pills -->
+    <div class="mb-8 flex flex-wrap items-center justify-center gap-3">
+      <span class="inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.04)] px-4 py-1.5 text-[15px] text-muted-foreground">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        12 MB app
+      </span>
+      <span class="inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.04)] px-4 py-1.5 text-[15px] text-muted-foreground">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        ~0% CPU at idle
+      </span>
+      <span class="inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.04)] px-4 py-1.5 text-[15px] text-muted-foreground">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        ~110 MB RAM
+      </span>
+      <span class="inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.04)] px-4 py-1.5 text-[15px] text-muted-foreground">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Open source · MIT
+      </span>
+    </div>
+
+    <p class="mb-10 max-w-lg text-[16px] leading-relaxed text-muted-foreground/60">
+      Native Rust backend. No Electron. Powered by the Agent Client Protocol.
+      macOS, Linux, and Windows.
     </p>
     <div class="flex flex-wrap items-center justify-center gap-4">
       <a href="https://github.com/thabti/kirodex/releases/latest"
@@ -188,21 +209,22 @@
     <!-- Tab panels -->
     <div id="panel-macos" role="tabpanel" aria-labelledby="tab-macos" class="tab-panel rounded-2xl border border-[rgba(255,255,255,0.08)] bg-card p-7">
       <p class="mb-3 text-[15px] font-medium text-muted-foreground">Homebrew (recommended)</p>
-      <pre class="mb-5 overflow-x-auto rounded-xl bg-[#16161c] p-5 text-[15px] leading-relaxed text-[#e0e0e0]"><code>brew install --cask thabti/tap/kirodex</code></pre>
+      <pre class="mb-5 overflow-x-auto rounded-xl bg-[#1c1c24] p-5 text-[15px] leading-relaxed text-[#e0e0e0]"><code>brew install --cask thabti/tap/kirodex        # first install
+brew update && brew reinstall kirodex          # upgrade</code></pre>
       <p class="text-[15px] text-muted-foreground">Or download the <a href="https://github.com/thabti/kirodex/releases/latest" class="text-[#4444FF] underline underline-offset-2">.dmg from GitHub Releases</a>.</p>
     </div>
 
     <div id="panel-linux" role="tabpanel" aria-labelledby="tab-linux" class="tab-panel hidden rounded-2xl border border-[rgba(255,255,255,0.08)] bg-card p-7">
       <p class="mb-3 text-[15px] font-medium text-muted-foreground">Debian / Ubuntu</p>
-      <pre class="mb-5 overflow-x-auto rounded-xl bg-[#16161c] p-5 text-[15px] leading-relaxed text-[#e0e0e0]"><code>sudo dpkg -i kirodex_*_amd64.deb</code></pre>
+      <pre class="mb-5 overflow-x-auto rounded-xl bg-[#1c1c24] p-5 text-[15px] leading-relaxed text-[#e0e0e0]"><code>sudo dpkg -i kirodex_*_amd64.deb</code></pre>
       <p class="mb-3 text-[15px] font-medium text-muted-foreground">AppImage</p>
-      <pre class="mb-5 overflow-x-auto rounded-xl bg-[#16161c] p-5 text-[15px] leading-relaxed text-[#e0e0e0]"><code>chmod +x Kirodex_*.AppImage && ./Kirodex_*.AppImage</code></pre>
+      <pre class="mb-5 overflow-x-auto rounded-xl bg-[#1c1c24] p-5 text-[15px] leading-relaxed text-[#e0e0e0]"><code>chmod +x Kirodex_*.AppImage && ./Kirodex_*.AppImage</code></pre>
       <p class="text-[15px] text-muted-foreground">Download from <a href="https://github.com/thabti/kirodex/releases/latest" class="text-[#4444FF] underline underline-offset-2">GitHub Releases</a>.</p>
     </div>
 
     <div id="panel-windows" role="tabpanel" aria-labelledby="tab-windows" class="tab-panel hidden rounded-2xl border border-[rgba(255,255,255,0.08)] bg-card p-7">
       <p class="mb-3 text-[15px] font-medium text-muted-foreground">Installer</p>
-      <pre class="mb-5 overflow-x-auto rounded-xl bg-[#16161c] p-5 text-[15px] leading-relaxed text-[#e0e0e0]"><code># Download the .exe or .msi from GitHub Releases
+      <pre class="mb-5 overflow-x-auto rounded-xl bg-[#1c1c24] p-5 text-[15px] leading-relaxed text-[#e0e0e0]"><code># Download the .exe or .msi from GitHub Releases
 # winget and scoop support coming soon</code></pre>
       <p class="text-[15px] text-muted-foreground">Download from <a href="https://github.com/thabti/kirodex/releases/latest" class="text-[#4444FF] underline underline-offset-2">GitHub Releases</a>.</p>
     </div>

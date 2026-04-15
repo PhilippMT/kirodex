@@ -4,13 +4,13 @@
   </a>
   <h1 align="center">Kirodex</h1>
   <p align="center">
-    AI coding agents on your desktop
-    <br />
-    Built with <a href="https://v2.tauri.app">Tauri v2</a> (Rust) and React 19 (TypeScript)
+    AI coding agents on your desktop — 12MB, ~0% CPU at idle
     <br />
     Inspired by <a href="https://github.com/openai/codex">OpenAI Codex</a> and <a href="https://github.com/pingdotgg/t3code">T3 Code</a>
     <br />
     <br />
+    <a href="https://thabti.github.io/kirodex/">Website</a>
+    ·
     <a href="https://github.com/thabti/kirodex/releases/latest">Download</a>
     ·
     <a href="https://github.com/thabti/kirodex/issues">Report Bug</a>
@@ -62,7 +62,8 @@
 **macOS (Homebrew):**
 
 ```bash
-brew install --cask thabti/tap/kirodex
+brew install --cask thabti/tap/kirodex        # first install
+brew update && brew reinstall kirodex          # upgrade
 ```
 
 **Linux:**
