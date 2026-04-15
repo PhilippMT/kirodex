@@ -2,8 +2,9 @@
   "name": "kirodex-website",
   "private": true,
   "scripts": {
-    "dev": "tailwindcss -i style.css -o dist/style.css --watch",
-    "build": "tailwindcss -i style.css -o dist/style.css --minify"
+    "dev": "tailwindcss -i style.css -o dist/style.css --watch & bunx serve . -l 3000 -s",
+    "build": "tailwindcss -i style.css -o dist/style.css --minify",
+    "serve": "bunx serve . -l 3000 -s"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.0.0",

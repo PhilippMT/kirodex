@@ -39,6 +39,14 @@ jobs:
           cp -r website/dist _site/
           cp -r website/assets _site/
 
+      - name: Inject base href for GitHub Pages
+        run: |
+          sed -i 's|<!-- base href injected by CI for GitHub Pages -->|<base href="/kirodex/">|' _site/index.html
+          sed -i 's|<!-- base href injected by CI for GitHub Pages -->|<base href="/kirodex/">|' _site/changelog.html
+
+      - name: Use production (blue) icon
+        run: cp src-tauri/icons/prod/icon.png _site/assets/icon.png
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
