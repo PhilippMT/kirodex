@@ -117,6 +117,8 @@ pub struct Task {
     pub auto_approve: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_paused: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_task_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -741,6 +743,7 @@ pub fn task_create(
         context_usage: None,
         auto_approve: Some(auto_approve),
         user_paused: None,
+        parent_task_id: None,
     };
 
     state.tasks.lock().map_err(|e| format!("Lock poisoned: {e}"))?.insert(id.clone(), task.clone());
@@ -955,7 +958,7 @@ pub struct ForkTaskParams {
 }
 
 #[tauri::command]
-pub fn task_fork(
+pub async fn task_fork(
     app: tauri::AppHandle,
     state: tauri::State<'_, AcpState>,
     settings_state: tauri::State<'_, crate::commands::settings::SettingsState>,
@@ -975,7 +978,7 @@ pub fn task_fork(
         .unwrap_or_else(|| "thread".to_string());
     let parent_messages = parent.as_ref().map(|p| p.messages.clone()).unwrap_or_default();
     let parent_auto_approve = parent.as_ref().and_then(|p| p.auto_approve);
-    // Try ACP fork if the parent has a live connection
+    // Try ACP fork if the parent has a live connection (best-effort, non-blocking)
     let has_live_connection = {
         let conns = state.connections.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
         conns.get(task_id)
@@ -990,13 +993,11 @@ pub fn task_fork(
                 let _ = handle.cmd_tx.send(AcpCommand::ForkSession(reply_tx));
             }
         }
-        // Best-effort with 10s timeout to avoid blocking the UI forever
-        let (done_tx, done_rx) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            let result = reply_rx.blocking_recv();
-            let _ = done_tx.send(result);
-        });
-        let _ = done_rx.recv_timeout(std::time::Duration::from_secs(10));
+        // Await the fork response with a timeout — non-blocking on the async runtime
+        let _ = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            reply_rx,
+        ).await;
     }
     // Create a new task with parent messages
     let new_id = Uuid::new_v4().to_string();
@@ -1007,7 +1008,7 @@ pub fn task_fork(
     drop(settings);
     let fork_task = Task {
         id: new_id.clone(),
-        name: format!("Fork of {}", parent_name),
+        name: format!("fork: {}", parent_name),
         workspace: workspace.clone(),
         status: "paused".to_string(),
         created_at: now.clone(),
@@ -1027,6 +1028,7 @@ pub fn task_fork(
         context_usage: None,
         auto_approve: Some(auto_approve),
         user_paused: None,
+        parent_task_id: Some(task_id.clone()),
     };
     state.tasks.lock().map_err(|e| format!("Lock poisoned: {e}"))?.insert(new_id.clone(), fork_task.clone());
     // Spawn a new ACP connection for the forked task
