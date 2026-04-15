@@ -38,13 +38,17 @@ const formatDetail = (args: unknown[]): string => {
     .join('\n')
 }
 
-const addEntry = (entry: Omit<JsDebugEntry, 'id' | 'timestamp' | 'taskId'>): void => {
-  const taskId = useTaskStore.getState().selectedTaskId ?? null
+const addEntry = (entry: Omit<JsDebugEntry, 'id' | 'timestamp' | 'taskId' | 'threadName' | 'projectName'>): void => {
+  const state = useTaskStore.getState()
+  const taskId = state.selectedTaskId ?? null
+  const task = taskId ? state.tasks[taskId] : null
   useJsDebugStore.getState().addEntry({
     ...entry,
     id: 0,
     timestamp: new Date().toISOString(),
     taskId,
+    threadName: task?.name ?? null,
+    projectName: task?.workspace?.replace(/\\/g, '/').split('/').pop() ?? null,
   } as JsDebugEntry)
 }
 

@@ -2,7 +2,6 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { IconTrash, IconChevronRight, IconChevronDown, IconCopy, IconCheck } from '@tabler/icons-react'
 import { useJsDebugStore } from '@/stores/jsDebugStore'
-import { useTaskStore } from '@/stores/taskStore'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
@@ -191,7 +190,6 @@ export const JsDebugTab = memo(function JsDebugTab() {
   const filter = useJsDebugStore((s) => s.filter)
   const setFilter = useJsDebugStore((s) => s.setFilter)
   const clear = useJsDebugStore((s) => s.clear)
-  const tasks = useTaskStore((s) => s.tasks)
 
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set())
   const parentRef = useRef<HTMLDivElement>(null)
@@ -201,38 +199,29 @@ export const JsDebugTab = memo(function JsDebugTab() {
     const threads = new Set<string>()
     const projects = new Set<string>()
     for (const e of entries) {
-      if (!e.taskId) continue
-      const task = tasks[e.taskId]
-      if (!task) continue
-      if (task.name) threads.add(task.name)
-      if (task.workspace) projects.add(task.workspace)
+      if (e.threadName) threads.add(e.threadName)
+      if (e.projectName) projects.add(e.projectName)
     }
     return {
       threadNames: [...threads].sort(),
       projectNames: [...projects].sort(),
     }
-  }, [entries, tasks])
+  }, [entries])
 
   const filtered = useMemo(() => {
     const lowerSearch = filter.search.toLowerCase()
     return entries.filter((e) => {
       if (filter.category !== 'all' && e.category !== filter.category) return false
       if (filter.errorsOnly && !e.isError) return false
-      if (filter.threadName) {
-        const task = e.taskId ? tasks[e.taskId] : null
-        if (!task || task.name !== filter.threadName) return false
-      }
-      if (filter.projectName) {
-        const task = e.taskId ? tasks[e.taskId] : null
-        if (!task || task.workspace !== filter.projectName) return false
-      }
+      if (filter.threadName && (e.threadName ?? '') !== filter.threadName) return false
+      if (filter.projectName && (e.projectName ?? '') !== filter.projectName) return false
       if (lowerSearch) {
         const haystack = `${e.message} ${e.detail} ${e.url ?? ''}`.toLowerCase()
         if (!haystack.includes(lowerSearch)) return false
       }
       return true
     })
-  }, [entries, filter, tasks])
+  }, [entries, filter])
 
   const virtualizer = useVirtualizer({
     count: filtered.length,
@@ -314,7 +303,7 @@ export const JsDebugTab = memo(function JsDebugTab() {
           >
             <option value="">All projects</option>
             {projectNames.map((p) => (
-              <option key={p} value={p}>{p.split('/').pop()}</option>
+              <option key={p} value={p}>{p}</option>
             ))}
           </select>
         )}
