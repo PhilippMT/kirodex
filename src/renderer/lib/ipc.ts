@@ -75,8 +75,8 @@ export const ipc = {
     currentBranch: string;
   }> =>
     invoke('git_list_branches', { cwd }),
-  gitCheckout: (cwd: string, branch: string): Promise<{ branch: string }> =>
-    invoke('git_checkout', { cwd, branch }),
+  gitCheckout: (cwd: string, branch: string, force?: boolean): Promise<{ branch: string }> =>
+    invoke('git_checkout', { cwd, branch, force }),
   gitCreateBranch: (cwd: string, branch: string): Promise<{ branch: string }> =>
     invoke('git_create_branch', { cwd, branch }),
   getTaskDiff: (taskId: string): Promise<string> =>

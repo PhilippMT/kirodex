@@ -48,6 +48,8 @@ export const BranchSelector = memo(function BranchSelector({ workspace, isWorktr
   const [checkingOut, setCheckingOut] = useState(false)
   const [inlineMode, setInlineMode] = useState<InlineMode>('none')
   const [inlineValue, setInlineValue] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [conflictBranch, setConflictBranch] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const inlineInputRef = useRef<HTMLInputElement>(null)
@@ -81,6 +83,8 @@ export const BranchSelector = memo(function BranchSelector({ workspace, isWorktr
       setSearch('')
       setInlineMode('none')
       setInlineValue('')
+      setError(null)
+      setConflictBranch(null)
       return
     }
     fetchBranches()
@@ -160,20 +164,34 @@ export const BranchSelector = memo(function BranchSelector({ workspace, isWorktr
   // ── Actions ─────────────────────────────────────────────────────────
 
   const handleCheckout = useCallback(
-    async (branch: string) => {
+    async (branch: string, force?: boolean) => {
       if (!workspace || checkingOut) return
+      if (isWorktree) {
+        setError('Cannot switch branches in a worktree thread. The branch is locked to this worktree.')
+        return
+      }
       setCheckingOut(true)
+      setError(null)
+      setConflictBranch(null)
       try {
-        await ipc.gitCheckout(workspace, branch)
+        await ipc.gitCheckout(workspace, branch, force)
         await fetchBranches()
+        setOpen(false)
       } catch (err) {
-        console.error('[branch-selector] checkout failed:', err)
+        const msg = err instanceof Error ? err.message : String(err)
+        const isConflict = msg.includes('conflict') || msg.includes('Conflict')
+        if (isConflict && !force) {
+          setError('Uncommitted changes conflict with this branch.')
+          setConflictBranch(branch)
+        } else {
+          setError(msg)
+          setConflictBranch(null)
+        }
       } finally {
         setCheckingOut(false)
-        setOpen(false)
       }
     },
-    [workspace, checkingOut, fetchBranches],
+    [workspace, checkingOut, fetchBranches, isWorktree],
   )
 
   const handleCreate = useCallback(
@@ -182,14 +200,17 @@ export const BranchSelector = memo(function BranchSelector({ workspace, isWorktr
       const branchName = slugify(name.trim())
       if (!branchName) return
       setCheckingOut(true)
+      setError(null)
       try {
         await ipc.gitCreateBranch(workspace, branchName)
         await fetchBranches()
+        setOpen(false)
       } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        setError(msg)
         console.error('[branch-selector] create failed:', err)
       } finally {
         setCheckingOut(false)
-        setOpen(false)
       }
     },
     [workspace, checkingOut, fetchBranches],
@@ -284,6 +305,27 @@ export const BranchSelector = memo(function BranchSelector({ workspace, isWorktr
 
           {/* Branch list */}
           <div className="max-h-64 overflow-y-auto scroll-smooth">
+            {error && (
+              <div className="mx-2 mt-2 rounded-lg bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
+                {error}
+                {conflictBranch && (
+                  <button
+                    type="button"
+                    onClick={() => handleCheckout(conflictBranch, true)}
+                    disabled={checkingOut}
+                    className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-md bg-destructive/15 px-2 py-1 text-[11px] font-medium text-destructive transition-colors hover:bg-destructive/25 disabled:opacity-50"
+                  >
+                    Force checkout (discard local changes)
+                  </button>
+                )}
+              </div>
+            )}
+            {isWorktree && (
+              <div className="mx-2 mt-2 flex items-center gap-1.5 rounded-lg bg-violet-500/10 px-3 py-2 text-[11px] text-violet-600 dark:text-violet-400">
+                <IconGitBranch className="size-3 shrink-0" aria-hidden />
+                Branch locked to this worktree
+              </div>
+            )}
             {loading && !data ? (
               <div className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
                 <IconLoader2 className="size-3.5 animate-spin" />
@@ -306,7 +348,7 @@ export const BranchSelector = memo(function BranchSelector({ workspace, isWorktr
                         key={branch.name}
                         name={branch.name}
                         isCurrent={branch.current}
-                        disabled={checkingOut}
+                        disabled={checkingOut || (isWorktree && !branch.current)}
                         onClick={() => handleCheckout(branch.name)}
                       />
                     ))}
@@ -325,7 +367,7 @@ export const BranchSelector = memo(function BranchSelector({ workspace, isWorktr
                         name={branch.name}
                         isCurrent={false}
                         badge="remote"
-                        disabled={checkingOut}
+                        disabled={checkingOut || !!isWorktree}
                         onClick={() => handleCheckout(branch.fullRef)}
                       />
                     ))}

@@ -152,10 +152,14 @@ pub fn git_list_branches(cwd: String) -> Result<BranchInfo, AppError> {
 }
 
 #[tauri::command]
-pub fn git_checkout(cwd: String, branch: String) -> Result<BranchResult, AppError> {
+pub fn git_checkout(cwd: String, branch: String, force: Option<bool>) -> Result<BranchResult, AppError> {
     let repo = Repository::open(&cwd)?;
     let (object, reference) = repo.revparse_ext(&branch)?;
-    repo.checkout_tree(&object, None)?;
+    let mut opts = git2::build::CheckoutBuilder::new();
+    if force.unwrap_or(false) {
+        opts.force();
+    }
+    repo.checkout_tree(&object, Some(&mut opts))?;
     if let Some(reference) = reference {
         repo.set_head(reference.name().unwrap_or(&format!("refs/heads/{branch}")))?;
     } else {
