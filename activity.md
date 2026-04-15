@@ -1,5 +1,13 @@
 # Activity Log
 
+## 2026-04-16 01:12 GST (Dubai)
+
+### Worktree: add confirmation dialog before deleting worktree threads
+
+Refactored `softDeleteTask` and `archiveTask` so worktree threads show a confirmation dialog BEFORE deletion, not after. The dialog displays the branch name, checks for uncommitted changes (with a loading spinner), and warns with an amber icon if changes exist. Three actions: Cancel (no-op), Delete & remove worktree (destructive), Delete & keep worktree on disk. `resolveWorktreeCleanup` now performs the actual delete/archive when the user confirms. Non-worktree threads still delete immediately.
+
+**Modified:** `src/renderer/stores/taskStore.ts`, `src/renderer/components/sidebar/WorktreeCleanupDialog.tsx`, `src/renderer/components/sidebar/WorktreeCleanupDialog.test.tsx`, `src/renderer/stores/taskStore.test.ts`
+
 ## 2026-04-16 01:05 GST (Dubai)
 
 ### Git: organize uncommitted changes into 11 conventional commits
