@@ -33,14 +33,14 @@ export const AutoApproveToggle = memo(function AutoApproveToggle() {
           onClick={toggle}
           data-testid="auto-approve-toggle"
           className={cn(
-            'flex items-center gap-1 rounded-lg px-1.5 py-1 text-[11px] font-medium transition-colors',
+            'flex items-center gap-1 rounded-lg px-1.5 py-1 text-[14px] font-medium transition-colors',
             active
               ? 'text-foreground/70 hover:text-foreground'
               : 'text-muted-foreground/50 hover:text-muted-foreground/70',
           )}
         >
           {active ? <IconShieldCheck className="size-3.5" /> : <IconShieldOff className="size-3.5" />}
-          <span>{active ? 'Full access' : 'Ask'}</span>
+          <span>{active ? 'Full' : 'Ask'}</span>
         </button>
       </TooltipTrigger>
       <TooltipContent side="top">{active ? 'Auto-approve all tools \u2014 click to require confirmation' : 'Ask before running tools \u2014 click to auto-approve'}</TooltipContent>

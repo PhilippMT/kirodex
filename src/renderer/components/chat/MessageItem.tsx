@@ -97,7 +97,9 @@ export const MessageItem = memo(function MessageItem({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
   const forkTask = useTaskStore((s) => s.forkTask);
-  const handleFork = useCallback(() => { if (selectedTaskId) void forkTask(selectedTaskId) }, [selectedTaskId, forkTask]);
+  const isForking = useTaskStore((s) => s.isForking);
+  const chatFontSize = useSettingsStore((s) => s.settings.fontSize ?? 14);
+  const handleFork = useCallback(() => { if (selectedTaskId && !isForking) void forkTask(selectedTaskId) }, [selectedTaskId, forkTask, isForking]);
 
   const handleCopy = useCallback(() => {
     void navigator.clipboard.writeText(message.content).then(() => {
@@ -167,7 +169,7 @@ export const MessageItem = memo(function MessageItem({
         <div className="flex justify-end">
           <div className="group relative max-w-[75%]">
             <div className="rounded-2xl rounded-br-md bg-primary/10 px-3.5 py-2 dark:bg-primary/[0.08]">
-              <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed text-foreground">
+              <p className="whitespace-pre-wrap break-words leading-relaxed text-foreground" style={{ fontSize: chatFontSize }}>
                 {message.content}
               </p>
             </div>
@@ -196,13 +198,14 @@ export const MessageItem = memo(function MessageItem({
                     <button
                       type="button"
                       onClick={handleFork}
+                      disabled={isForking}
                       aria-label="Fork thread from here"
-                      className="rounded-md p-0.5 text-muted-foreground/0 transition-all group-hover:text-muted-foreground/70 hover:!text-foreground"
+                      className="rounded-md p-0.5 text-muted-foreground/0 transition-all group-hover:text-muted-foreground/70 hover:!text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <IconGitFork className="size-3" aria-hidden />
+                      <IconGitFork className={`size-3 ${isForking ? 'animate-spin' : ''}`} aria-hidden />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom">Fork thread</TooltipContent>
+                  <TooltipContent side="bottom">{isForking ? 'Forking…' : 'Fork thread'}</TooltipContent>
                 </Tooltip>
               )}
               <span className="text-[10px] tabular-nums text-muted-foreground/60">

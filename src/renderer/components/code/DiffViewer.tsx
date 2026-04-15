@@ -105,8 +105,8 @@ function FileActionBar({
         <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-foreground" title={name}>
           {shortName}
         </span>
-        {additions > 0 && <span className="text-[10px] font-semibold text-emerald-400">+{additions}</span>}
-        {deletions > 0 && <span className="text-[10px] font-semibold text-red-400">-{deletions}</span>}
+        {additions > 0 && <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">+{additions}</span>}
+        {deletions > 0 && <span className="text-[10px] font-semibold text-red-600 dark:text-red-400">-{deletions}</span>}
 
         {/* Actions */}
         <div className="ml-1 flex items-center gap-0.5">
@@ -224,8 +224,10 @@ export function DiffViewer({ diff, taskId, workspace, onRefreshDiff }: DiffViewe
     const idx = parsedFiles.findIndex((f) =>
       f.name.replace(/^[ab]\//, '').includes(focusFile)
     )
-    if (idx >= 0) setSelectedFileIdx(idx)
-    useDiffStore.setState({ focusFile: null })
+    if (idx >= 0) {
+      setSelectedFileIdx(idx)
+      useDiffStore.setState({ focusFile: null })
+    }
   }, [focusFile, parsedFiles])
 
   // Determine which file indices to show
@@ -287,8 +289,8 @@ export function DiffViewer({ diff, taskId, workspace, onRefreshDiff }: DiffViewe
         <span className="text-[10px] text-muted-foreground">
           {parsedFiles.length} file{parsedFiles.length !== 1 ? 's' : ''}
         </span>
-        <span className="text-[10px] text-emerald-400">+{totalAdditions}</span>
-        <span className="text-[10px] text-red-400">-{totalDeletions}</span>
+        <span className="text-[10px] text-emerald-600 dark:text-emerald-400">+{totalAdditions}</span>
+        <span className="text-[10px] text-red-600 dark:text-red-400">-{totalDeletions}</span>
 
         <div className="flex-1" />
 
@@ -386,8 +388,8 @@ export function DiffViewer({ diff, taskId, workspace, onRefreshDiff }: DiffViewe
                   <IconFileCode className="size-3 shrink-0 text-muted-foreground/70" />
                   <span className="min-w-0 flex-1 truncate">{file.name.split('/').pop()}</span>
                   <span className="shrink-0 flex gap-1">
-                    {file.additions > 0 && <span className="text-emerald-400">+{file.additions}</span>}
-                    {file.deletions > 0 && <span className="text-red-400">-{file.deletions}</span>}
+                    {file.additions > 0 && <span className="text-emerald-600 dark:text-emerald-400">+{file.additions}</span>}
+                    {file.deletions > 0 && <span className="text-red-600 dark:text-red-400">-{file.deletions}</span>}
                   </span>
                 </button>
               ))}

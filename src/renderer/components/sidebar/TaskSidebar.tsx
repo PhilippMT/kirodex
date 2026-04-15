@@ -1,5 +1,5 @@
 import { memo, useCallback, useRef, useState } from 'react'
-import { IconPlus, IconArrowsUpDown, IconCheck, IconLayoutSidebarLeftCollapse, IconLayoutSidebarRightCollapse } from '@tabler/icons-react'
+import { IconPlus, IconArrowsUpDown, IconCheck, IconLayoutSidebarLeftCollapse, IconLayoutSidebarRightCollapse, IconFolderOpen } from '@tabler/icons-react'
 import { useTaskStore } from '@/stores/taskStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useShallow } from 'zustand/react/shallow'
@@ -11,6 +11,7 @@ import { useSidebarTasks, type SortKey } from '@/hooks/useSidebarTasks'
 import { useResizeHandle } from '@/hooks/useResizeHandle'
 import { ProjectItem } from './ProjectItem'
 import { SidebarFooter } from './SidebarFooter'
+import { RecentlyDeleted } from './RecentlyDeleted'
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'recent', label: 'Recent' },
@@ -193,7 +194,24 @@ export const TaskSidebar = memo(function TaskSidebar({ width, onResize, position
           <div className="relative flex min-w-0 flex-col">
             <ul className="flex min-w-0 flex-col gap-0.5">
               {projectList.length === 0 && (
-                <p className="px-3 py-6 text-center text-xs text-muted-foreground">No projects yet — click + to import a folder</p>
+                <li className="flex flex-col items-center gap-3 px-3 py-8 text-center">
+                  <div className="flex size-10 items-center justify-center rounded-xl bg-muted/30">
+                    <IconFolderOpen size={20} stroke={1.5} className="text-muted-foreground/40" />
+                  </div>
+                  <div>
+                    <p className="text-[12px] font-medium text-muted-foreground/70">No projects yet</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground/40">Import a folder to start working with Kiro</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setNewProjectOpen(true)}
+                    aria-label="Import project folder"
+                    tabIndex={0}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <IconPlus size={12} /> Import Project
+                  </button>
+                </li>
               )}
               {projectList.map((project, idx) => (
                 <ProjectItem
@@ -219,6 +237,7 @@ export const TaskSidebar = memo(function TaskSidebar({ width, onResize, position
               ))}
             </ul>
           </div>
+          <RecentlyDeleted />
         </div>
       </ScrollArea>
       <SidebarFooter />

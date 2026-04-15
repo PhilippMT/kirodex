@@ -1,4 +1,4 @@
-import { memo, useState, useRef, useCallback, useMemo, type ReactNode } from 'react'
+import { memo, useState, useRef, useCallback, useContext, useMemo, type ReactNode } from 'react'
 import { IconCopy, IconCheck, IconPhoto, IconFileText, IconFile, IconRobot, IconTool, IconGitFork } from '@tabler/icons-react'
 import {
   Tooltip,
@@ -6,8 +6,10 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { CollapsedAnswers } from './CollapsedAnswers'
+import { highlightNode, SearchQueryContext } from './HighlightText'
 import { useDiffStore } from '@/stores/diffStore'
 import { useTaskStore } from '@/stores/taskStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import type { UserMessageRow as UserMessageRowData } from '@/lib/timeline'
 
 /** Match all @mentions: @agent:name, @skill:name, @file/paths */
@@ -111,9 +113,12 @@ const AttachmentPill = memo(function AttachmentPill({ name, type, src }: { name:
 export const UserMessageRow = memo(function UserMessageRow({ row }: { row: UserMessageRowData }) {
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId)
   const forkTask = useTaskStore((s) => s.forkTask)
-  const handleFork = useCallback(() => { if (selectedTaskId) void forkTask(selectedTaskId) }, [selectedTaskId, forkTask])
+  const isForking = useTaskStore((s) => s.isForking)
+  const chatFontSize = useSettingsStore((s) => s.settings.fontSize ?? 14)
+  const handleFork = useCallback(() => { if (selectedTaskId && !isForking) void forkTask(selectedTaskId) }, [selectedTaskId, forkTask, isForking])
   const [copied, setCopied] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchQuery = useContext(SearchQueryContext)
 
   const handleCopy = useCallback(() => {
     void navigator.clipboard.writeText(row.content).then(() => {
@@ -138,11 +143,11 @@ export const UserMessageRow = memo(function UserMessageRow({ row }: { row: UserM
           {isQuestionAnswer ? (
             <CollapsedAnswers questionAnswers={row.questionAnswers!} />
           ) : (
-          <div className="rounded-2xl rounded-br-md bg-[#1a1b1e] px-4 py-2.5">
+          <div className="rounded-2xl rounded-br-md bg-card px-4 py-2.5">
               <div className="space-y-2">
                 {cleanText && (
-                  <p className="whitespace-pre-wrap break-words text-[15px] leading-[1.7] text-foreground">
-                    {renderWithMentions(cleanText)}
+                  <p className="whitespace-pre-wrap break-words leading-[1.7] text-foreground" style={{ fontSize: chatFontSize }}>
+                    {highlightNode(renderWithMentions(cleanText), searchQuery)}
                   </p>
                 )}
                 {parsedAttachments.length > 0 && (
@@ -180,13 +185,14 @@ export const UserMessageRow = memo(function UserMessageRow({ row }: { row: UserM
                   <button
                     type="button"
                     onClick={handleFork}
+                    disabled={isForking}
                     aria-label="Fork thread from here"
-                    className="rounded-md p-0.5 text-muted-foreground/0 transition-all group-hover:text-muted-foreground/70 hover:!text-foreground"
+                    className="rounded-md p-0.5 text-muted-foreground/0 transition-all group-hover:text-muted-foreground/70 hover:!text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <IconGitFork className="size-3" aria-hidden />
+                    <IconGitFork className={`size-3 ${isForking ? 'animate-spin' : ''}`} aria-hidden />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="bottom">Fork thread</TooltipContent>
+                <TooltipContent side="bottom">{isForking ? 'Forking…' : 'Fork thread'}</TooltipContent>
               </Tooltip>
             )}
             <span className="text-[11px] tabular-nums text-muted-foreground/60">

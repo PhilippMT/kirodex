@@ -235,7 +235,7 @@ export const ChatInput = memo(function ChatInput({ disabled, disabledReason, con
             onClick={onToggleCollapse}
             aria-label="Expand chat input"
             className={cn(
-              'flex w-full items-center justify-between gap-2 rounded-2xl border bg-[#1a1b1e] px-4 py-2.5 transition-colors',
+              'flex w-full items-center justify-between gap-2 rounded-2xl border bg-card px-4 py-2.5 transition-colors',
               borderIdle,
               'hover:border-muted-foreground/30',
             )}
@@ -252,7 +252,7 @@ export const ChatInput = memo(function ChatInput({ disabled, disabledReason, con
     <div data-testid="chat-input" className="px-4 pt-1.5 pb-4 sm:px-6 sm:pt-2 sm:pb-5">
       <div className="mx-auto w-full min-w-0 max-w-3xl lg:max-w-4xl xl:max-w-5xl">
         <div className={cn(
-          'relative rounded-[20px] border-2 bg-[#1a1b1e] transition-colors duration-200',
+          'relative rounded-[20px] border-2 bg-card transition-colors duration-200',
           borderIdle, borderFocus,
           isDragOver && 'border-primary/50',
         )}>
@@ -321,7 +321,7 @@ export const ChatInput = memo(function ChatInput({ disabled, disabledReason, con
             {/* Scroll shadow at top of textarea when content overflows */}
             <div
               className={cn(
-                'pointer-events-none absolute left-3 right-3 h-6 bg-gradient-to-b from-[#1a1b1e] to-transparent transition-opacity duration-200 sm:left-4 sm:right-4',
+                'pointer-events-none absolute left-3 right-3 h-6 bg-gradient-to-b from-card to-transparent transition-opacity duration-200 sm:left-4 sm:right-4',
                 hasScrollShadow ? 'opacity-100' : 'opacity-0',
               )}
               style={{ top: 'calc(0.875rem)' }}
@@ -340,7 +340,7 @@ export const ChatInput = memo(function ChatInput({ disabled, disabledReason, con
               disabled={disabled}
               rows={1}
               className={cn(
-                'block max-h-[200px] min-h-[70px] w-full resize-none rounded-lg bg-transparent leading-[1.6] text-foreground outline-none placeholder:text-muted-foreground/60',
+                'block max-h-[200px] min-h-[70px] w-full resize-none rounded-lg bg-transparent text-sm leading-[1.6] text-foreground outline-none placeholder:text-muted-foreground/60',
                 disabled && 'cursor-not-allowed opacity-50',
               )}
               style={{ overflow: 'auto', fontFamily: 'inherit', caretColor: 'var(--foreground)' }}
@@ -413,8 +413,10 @@ export const ChatInput = memo(function ChatInput({ disabled, disabledReason, con
                       onClick={onPause}
                       aria-label="Pause agent (Escape)"
                       data-testid="pause-button"
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-white transition-all duration-150 hover:scale-105"
-                      style={{ backgroundColor: isPlanMode ? 'rgba(20,184,166,0.9)' : 'rgba(59,130,246,0.9)' }}
+                      className={cn(
+                        'flex h-8 w-8 items-center justify-center rounded-full text-white transition-all duration-150 hover:scale-105',
+                        isPlanMode ? 'bg-teal-500/90 hover:bg-teal-500' : 'bg-blue-500/90 hover:bg-blue-500',
+                      )}
                     >
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
                         <rect x="1.5" y="1" width="3" height="10" rx="1" />

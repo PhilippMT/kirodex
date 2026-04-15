@@ -102,6 +102,9 @@ export const QuestionCards = memo(function QuestionCards({
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (dismissed || total === 0) return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      const isEditable = tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable;
+      if (isEditable) return;
       if (e.key === "Escape") {
         e.preventDefault();
         handleDismiss();

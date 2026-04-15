@@ -12,7 +12,9 @@ vi.mock('@/lib/ipc', () => ({
 vi.mock('@/lib/history-store', () => ({
   loadThreads: vi.fn().mockResolvedValue([]),
   loadProjects: vi.fn().mockResolvedValue([]),
+  loadSoftDeleted: vi.fn().mockResolvedValue([]),
   saveThreads: vi.fn().mockResolvedValue(undefined),
+  saveSoftDeleted: vi.fn().mockResolvedValue(undefined),
   toArchivedTasks: vi.fn().mockReturnValue([]),
   clearHistory: vi.fn().mockResolvedValue(undefined),
 }))
@@ -44,7 +46,7 @@ const makeTask = (overrides?: Partial<AgentTask>): AgentTask => ({
 
 beforeEach(() => {
   useTaskStore.setState({
-    tasks: {}, projects: [], deletedTaskIds: new Set(), selectedTaskId: null,
+    tasks: {}, projects: [], deletedTaskIds: new Set(), softDeleted: {}, selectedTaskId: null,
     streamingChunks: {}, thinkingChunks: {}, liveToolCalls: {},
     queuedMessages: {}, activityFeed: [], connected: false,
     terminalOpenTasks: new Set(), pendingWorkspace: null,
@@ -682,5 +684,189 @@ describe('setSettingsOpen', () => {
   it('opens settings without section defaults to null', () => {
     useTaskStore.getState().setSettingsOpen(true)
     expect(useTaskStore.getState().settingsInitialSection).toBeNull()
+  })
+})
+
+describe('softDeleteTask', () => {
+  it('moves task from tasks to softDeleted with deletedAt timestamp', () => {
+    useTaskStore.getState().upsertTask(makeTask())
+    useTaskStore.getState().softDeleteTask('task-1')
+    expect(useTaskStore.getState().tasks['task-1']).toBeUndefined()
+    const sd = useTaskStore.getState().softDeleted['task-1']
+    expect(sd).toBeDefined()
+    expect(sd.task.id).toBe('task-1')
+    expect(sd.task.isArchived).toBe(true)
+    expect(sd.task.status).toBe('completed')
+    expect(sd.deletedAt).toBeTruthy()
+  })
+
+  it('clears streaming data for soft-deleted task', () => {
+    useTaskStore.getState().upsertTask(makeTask())
+    useTaskStore.setState({
+      streamingChunks: { 'task-1': 'text' },
+      thinkingChunks: { 'task-1': 'think' },
+      liveToolCalls: { 'task-1': [] },
+    })
+    useTaskStore.getState().softDeleteTask('task-1')
+    expect(useTaskStore.getState().streamingChunks['task-1']).toBeUndefined()
+    expect(useTaskStore.getState().thinkingChunks['task-1']).toBeUndefined()
+    expect(useTaskStore.getState().liveToolCalls['task-1']).toBeUndefined()
+  })
+
+  it('adds to deletedTaskIds', () => {
+    useTaskStore.getState().upsertTask(makeTask())
+    useTaskStore.getState().softDeleteTask('task-1')
+    expect(useTaskStore.getState().deletedTaskIds.has('task-1')).toBe(true)
+  })
+
+  it('clears selectedTaskId if soft-deleted', () => {
+    useTaskStore.getState().upsertTask(makeTask())
+    useTaskStore.setState({ selectedTaskId: 'task-1' })
+    useTaskStore.getState().softDeleteTask('task-1')
+    expect(useTaskStore.getState().selectedTaskId).toBeNull()
+  })
+
+  it('no-ops for non-existent task', () => {
+    const before = useTaskStore.getState().softDeleted
+    useTaskStore.getState().softDeleteTask('nonexistent')
+    expect(useTaskStore.getState().softDeleted).toBe(before)
+  })
+})
+
+describe('restoreTask', () => {
+  it('moves task from softDeleted back to tasks', () => {
+    useTaskStore.getState().upsertTask(makeTask())
+    useTaskStore.getState().softDeleteTask('task-1')
+    useTaskStore.getState().restoreTask('task-1')
+    expect(useTaskStore.getState().tasks['task-1']).toBeDefined()
+    expect(useTaskStore.getState().tasks['task-1'].isArchived).toBe(true)
+    expect(useTaskStore.getState().softDeleted['task-1']).toBeUndefined()
+  })
+
+  it('removes from deletedTaskIds so upsertTask works again', () => {
+    useTaskStore.getState().upsertTask(makeTask())
+    useTaskStore.getState().softDeleteTask('task-1')
+    expect(useTaskStore.getState().deletedTaskIds.has('task-1')).toBe(true)
+    useTaskStore.getState().restoreTask('task-1')
+    expect(useTaskStore.getState().deletedTaskIds.has('task-1')).toBe(false)
+  })
+
+  it('adds workspace to projects if not present', () => {
+    useTaskStore.getState().upsertTask(makeTask({ workspace: '/new-ws' }))
+    useTaskStore.getState().softDeleteTask('task-1')
+    useTaskStore.setState({ projects: [] })
+    useTaskStore.getState().restoreTask('task-1')
+    expect(useTaskStore.getState().projects).toContain('/new-ws')
+  })
+
+  it('no-ops for non-existent soft-deleted task', () => {
+    const before = useTaskStore.getState().tasks
+    useTaskStore.getState().restoreTask('nonexistent')
+    expect(useTaskStore.getState().tasks).toBe(before)
+  })
+})
+
+describe('permanentlyDeleteTask', () => {
+  it('removes from softDeleted and adds to deletedTaskIds', () => {
+    useTaskStore.getState().upsertTask(makeTask())
+    useTaskStore.getState().softDeleteTask('task-1')
+    useTaskStore.getState().permanentlyDeleteTask('task-1')
+    expect(useTaskStore.getState().softDeleted['task-1']).toBeUndefined()
+    expect(useTaskStore.getState().deletedTaskIds.has('task-1')).toBe(true)
+  })
+
+  it('no-ops for non-existent soft-deleted task', () => {
+    const before = useTaskStore.getState().softDeleted
+    useTaskStore.getState().permanentlyDeleteTask('nonexistent')
+    expect(useTaskStore.getState().softDeleted).toBe(before)
+  })
+})
+
+describe('purgeExpiredSoftDeletes', () => {
+  it('removes threads older than 48 hours', () => {
+    const threeDaysAgo = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString()
+    useTaskStore.setState({
+      softDeleted: {
+        't1': { task: makeTask({ id: 't1' }), deletedAt: threeDaysAgo },
+      },
+    })
+    useTaskStore.getState().purgeExpiredSoftDeletes()
+    expect(useTaskStore.getState().softDeleted['t1']).toBeUndefined()
+    expect(useTaskStore.getState().deletedTaskIds.has('t1')).toBe(true)
+  })
+
+  it('keeps threads newer than 48 hours', () => {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    useTaskStore.setState({
+      softDeleted: {
+        't1': { task: makeTask({ id: 't1' }), deletedAt: oneHourAgo },
+      },
+    })
+    useTaskStore.getState().purgeExpiredSoftDeletes()
+    expect(useTaskStore.getState().softDeleted['t1']).toBeDefined()
+  })
+
+  it('purges expired and keeps recent in mixed set', () => {
+    const threeDaysAgo = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString()
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    useTaskStore.setState({
+      softDeleted: {
+        'old': { task: makeTask({ id: 'old' }), deletedAt: threeDaysAgo },
+        'new': { task: makeTask({ id: 'new' }), deletedAt: oneHourAgo },
+      },
+    })
+    useTaskStore.getState().purgeExpiredSoftDeletes()
+    expect(useTaskStore.getState().softDeleted['old']).toBeUndefined()
+    expect(useTaskStore.getState().softDeleted['new']).toBeDefined()
+  })
+
+  it('no-ops when softDeleted is empty', () => {
+    const before = useTaskStore.getState().softDeleted
+    useTaskStore.getState().purgeExpiredSoftDeletes()
+    expect(useTaskStore.getState().softDeleted).toBe(before)
+  })
+})
+
+describe('removeTask delegates to softDeleteTask', () => {
+  it('soft-deletes instead of permanently deleting', () => {
+    useTaskStore.getState().upsertTask(makeTask())
+    useTaskStore.getState().removeTask('task-1')
+    expect(useTaskStore.getState().tasks['task-1']).toBeUndefined()
+    expect(useTaskStore.getState().softDeleted['task-1']).toBeDefined()
+  })
+})
+
+describe('removeProject soft-deletes threads', () => {
+  it('moves project threads to softDeleted', () => {
+    useTaskStore.getState().addProject('/ws')
+    useTaskStore.getState().upsertTask(makeTask({ id: 't1', workspace: '/ws' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 't2', workspace: '/ws' }))
+    useTaskStore.getState().removeProject('/ws')
+    expect(useTaskStore.getState().softDeleted['t1']).toBeDefined()
+    expect(useTaskStore.getState().softDeleted['t2']).toBeDefined()
+  })
+})
+
+describe('archiveThreads soft-deletes threads', () => {
+  it('moves workspace threads to softDeleted', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 't1', workspace: '/ws' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 't2', workspace: '/ws' }))
+    useTaskStore.getState().archiveThreads('/ws')
+    expect(useTaskStore.getState().softDeleted['t1']).toBeDefined()
+    expect(useTaskStore.getState().softDeleted['t2']).toBeDefined()
+    expect(useTaskStore.getState().tasks['t1']).toBeUndefined()
+    expect(useTaskStore.getState().tasks['t2']).toBeUndefined()
+  })
+})
+
+describe('clearHistory clears softDeleted', () => {
+  it('resets softDeleted to empty object', async () => {
+    useTaskStore.setState({
+      softDeleted: {
+        't1': { task: makeTask({ id: 't1' }), deletedAt: new Date().toISOString() },
+      },
+    })
+    await useTaskStore.getState().clearHistory()
+    expect(Object.keys(useTaskStore.getState().softDeleted)).toHaveLength(0)
   })
 })

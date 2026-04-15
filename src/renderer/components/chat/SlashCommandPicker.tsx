@@ -143,7 +143,7 @@ export const SlashCommandPicker = memo(function SlashCommandPicker({
   if (filtered.length === 0) return null
   return (
     <div
-      className="absolute bottom-full left-0 right-0 z-[300] mb-2 overflow-hidden rounded-xl border border-border bg-popover shadow-xl"
+      className="absolute bottom-full left-0 right-0 z-[300] mb-2 overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/5 floating-panel"
       role="listbox"
       aria-label="Slash commands"
     >

@@ -98,8 +98,10 @@ export const DiffPanel = memo(function DiffPanel() {
     const idx = parsedFiles.findIndex((f) =>
       f.name.replace(/^[ab]\//, '').includes(focusFile)
     )
-    if (idx >= 0) setSelectedFileIdx(idx)
-    useDiffStore.setState({ focusFile: null })
+    if (idx >= 0) {
+      setSelectedFileIdx(idx)
+      useDiffStore.setState({ focusFile: null })
+    }
   }, [focusFile, parsedFiles])
 
   const visibleFiles = useMemo(() => {
@@ -162,10 +164,10 @@ export const DiffPanel = memo(function DiffPanel() {
         </span>
 
         {stats.additions > 0 && (
-          <span className="text-[11px] font-semibold tabular-nums text-emerald-400">+{stats.additions.toLocaleString()}</span>
+          <span className="text-[11px] font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">+{stats.additions.toLocaleString()}</span>
         )}
         {stats.deletions > 0 && (
-          <span className="text-[11px] font-semibold tabular-nums text-red-400">-{stats.deletions.toLocaleString()}</span>
+          <span className="text-[11px] font-semibold tabular-nums text-red-600 dark:text-red-400">-{stats.deletions.toLocaleString()}</span>
         )}
 
         {!taskWorkspace && (
@@ -295,8 +297,8 @@ export const DiffPanel = memo(function DiffPanel() {
                     <IconFileCode className="size-3 shrink-0 text-muted-foreground/70" />
                     <span className="min-w-0 flex-1 truncate text-left">{file.name.split('/').pop()}</span>
                     <span className="shrink-0 flex gap-1">
-                      {file.additions > 0 && <span className="text-emerald-400">+{file.additions}</span>}
-                      {file.deletions > 0 && <span className="text-red-400">-{file.deletions}</span>}
+                      {file.additions > 0 && <span className="text-emerald-600 dark:text-emerald-400">+{file.additions}</span>}
+                      {file.deletions > 0 && <span className="text-red-600 dark:text-red-400">-{file.deletions}</span>}
                     </span>
                   </button>
                 </div>
@@ -311,7 +313,7 @@ export const DiffPanel = memo(function DiffPanel() {
                     type="button"
                     onClick={handleStageSelected}
                     data-testid="diff-stage-button"
-                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-400 hover:bg-emerald-400/10 transition-colors"
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-400/10 transition-colors"
                     aria-label="Stage selected files"
                   >
                     <IconPlus className="size-3" />

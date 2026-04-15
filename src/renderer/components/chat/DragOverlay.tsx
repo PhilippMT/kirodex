@@ -84,7 +84,7 @@ export const DragOverlay = memo(function DragOverlay({ visible }: DragOverlayPro
       <span className="text-sm font-medium text-foreground/60">
         Drop files here
       </span>
-      <span className="text-[11px] text-muted-foreground/50">
+      <span className="text-sm text-muted-foreground/50">
         Images, code, documents
       </span>
       <style>{`

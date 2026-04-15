@@ -5,7 +5,7 @@
  * Lazy-loaded: no disk I/O until first access.
  */
 import { LazyStore } from '@tauri-apps/plugin-store'
-import type { AgentTask, TaskMessage } from '@/types'
+import type { AgentTask, TaskMessage, SoftDeletedThread } from '@/types'
 
 // ── Persisted types ──────────────────────────────────────────────
 
@@ -22,6 +22,7 @@ interface SavedThread {
   workspace: string
   createdAt: string
   messages: SavedMessage[]
+  parentTaskId?: string
 }
 
 interface SavedProject {
@@ -56,6 +57,7 @@ export async function saveThreads(tasks: Record<string, AgentTask>, projectNames
       workspace: t.workspace,
       createdAt: t.createdAt,
       messages: t.messages.map(toSavedMessage),
+      ...(t.parentTaskId ? { parentTaskId: t.parentTaskId } : {}),
     }))
 
   // Group thread IDs by workspace
@@ -87,13 +89,25 @@ export function toArchivedTasks(saved: SavedThread[]): AgentTask[] {
     createdAt: t.createdAt,
     messages: t.messages.map(toTaskMessage),
     isArchived: true,
+    ...(t.parentTaskId ? { parentTaskId: t.parentTaskId } : {}),
   }))
+}
+
+/** Load soft-deleted threads (returns [] if nothing saved) */
+export async function loadSoftDeleted(): Promise<SoftDeletedThread[]> {
+  return (await store.get<SoftDeletedThread[]>('softDeleted')) ?? []
+}
+
+/** Persist soft-deleted threads */
+export async function saveSoftDeleted(items: SoftDeletedThread[]): Promise<void> {
+  await store.set('softDeleted', items)
 }
 
 /** Clear all persisted history */
 export async function clearHistory(): Promise<void> {
   await store.delete('threads')
   await store.delete('projects')
+  await store.delete('softDeleted')
   await store.save()
 }
 

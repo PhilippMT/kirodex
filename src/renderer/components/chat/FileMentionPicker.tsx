@@ -215,7 +215,7 @@ export const FileMentionPill = memo(function FileMentionPill({ path, onRemove }:
         <button
           type="button"
           onClick={onRemove}
-          className="ml-0.5 flex size-4 items-center justify-center rounded text-current/40 hover:text-destructive"
+          className="ml-0.5 flex size-4 items-center justify-center rounded bg-muted/80 text-foreground/50 hover:bg-destructive/20 hover:text-destructive"
         >
           <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
             <path d="M1 1l6 6M7 1l-6 6" />
@@ -339,7 +339,7 @@ export const FileMentionPicker = memo(function FileMentionPicker({
 
   if (loading) {
     return (
-      <div className="absolute bottom-full left-0 right-0 z-[300] mb-2 overflow-hidden rounded-xl border border-border bg-popover shadow-xl">
+      <div className="absolute bottom-full left-0 right-0 z-[300] mb-2 overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/5 floating-panel">
         <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground/70">
           <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.2" />
@@ -353,7 +353,7 @@ export const FileMentionPicker = memo(function FileMentionPicker({
 
   if (totalItems === 0) {
     return (
-      <div className="absolute bottom-full left-0 right-0 z-[300] mb-2 overflow-hidden rounded-xl border border-border bg-popover shadow-xl">
+      <div className="absolute bottom-full left-0 right-0 z-[300] mb-2 overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/5 floating-panel">
         <p className="px-3 py-3 text-xs text-muted-foreground/70">No files found</p>
       </div>
     )
@@ -361,7 +361,7 @@ export const FileMentionPicker = memo(function FileMentionPicker({
 
   return (
     <div
-      className="absolute bottom-full left-0 right-0 z-[300] mb-2 overflow-hidden rounded-xl border border-border bg-popover shadow-xl"
+      className="absolute bottom-full left-0 right-0 z-[300] mb-2 overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/5 floating-panel"
       role="listbox"
       aria-label="File mentions"
     >

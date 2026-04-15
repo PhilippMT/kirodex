@@ -73,7 +73,8 @@ const AppHeaderInner = memo(function AppHeaderInner({ sidePanelOpen, onToggleSid
   const handleResume = useCallback(() => { if (selectedTaskId) ipc.resumeTask(selectedTaskId) }, [selectedTaskId])
   const handleCancel = useCallback(() => { if (selectedTaskId) ipc.cancelTask(selectedTaskId) }, [selectedTaskId])
   const forkTask = useTaskStore((s) => s.forkTask)
-  const handleFork = useCallback(() => { if (selectedTaskId) void forkTask(selectedTaskId) }, [selectedTaskId, forkTask])
+  const isForking = useTaskStore((s) => s.isForking)
+  const handleFork = useCallback(() => { if (selectedTaskId && !isForking) void forkTask(selectedTaskId) }, [selectedTaskId, forkTask, isForking])
 
   // Show workspace from task or from pendingWorkspace (before first message)
   const projectName = workspace?.split('/').pop() ?? null
@@ -231,12 +232,13 @@ const AppHeaderInner = memo(function AppHeaderInner({ sidePanelOpen, onToggleSid
                   data-testid="header-fork-button"
                   aria-label="Fork thread"
                   onClick={handleFork}
-                  className="inline-flex h-6 items-center rounded-md border border-input bg-popover px-1.5 text-xs shadow-xs/5 transition-colors hover:bg-accent/50 dark:bg-input/32 text-muted-foreground"
+                  disabled={isForking}
+                  className="inline-flex h-6 items-center rounded-md border border-input bg-popover px-1.5 text-xs shadow-xs/5 transition-colors hover:bg-accent/50 dark:bg-input/32 text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <IconGitFork className="size-3" aria-hidden />
+                  <IconGitFork className={`size-3 ${isForking ? 'animate-spin' : ''}`} aria-hidden />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="bottom">Fork thread</TooltipContent>
+              <TooltipContent side="bottom">{isForking ? 'Forking…' : 'Fork thread'}</TooltipContent>
             </Tooltip>
           )}
 

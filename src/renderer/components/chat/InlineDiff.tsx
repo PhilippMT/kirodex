@@ -14,8 +14,8 @@ export const InlineDiff = memo(function InlineDiff({ diffText }: { diffText: str
       <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 text-[11px] text-muted-foreground/60">
         <span>Changes</span>
         <span className="flex-1" />
-        {added > 0 && <span className="text-emerald-400">+{added}</span>}
-        {deleted > 0 && <span className="text-red-400">-{deleted}</span>}
+        {added > 0 && <span className="text-emerald-600 dark:text-emerald-400">+{added}</span>}
+        {deleted > 0 && <span className="text-red-600 dark:text-red-400">-{deleted}</span>}
       </div>
       <pre className="max-h-[200px] overflow-auto px-0 py-1 font-mono text-[12px] leading-[1.55]">
         {lines.map((line, i) => {
@@ -31,14 +31,14 @@ export const InlineDiff = memo(function InlineDiff({ diffText }: { diffText: str
           }
           if (line.startsWith('+')) {
             return (
-              <div key={i} className="px-3 bg-emerald-500/8 text-emerald-400/80">
+              <div key={i} className="px-3 bg-emerald-500/8 text-emerald-600/80 dark:text-emerald-400/80">
                 {line}
               </div>
             )
           }
           if (line.startsWith('-')) {
             return (
-              <div key={i} className="px-3 bg-red-500/8 text-red-400/80">
+              <div key={i} className="px-3 bg-red-500/8 text-red-600/80 dark:text-red-400/80">
                 {line}
               </div>
             )

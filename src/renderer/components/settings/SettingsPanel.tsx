@@ -13,19 +13,21 @@ import { ipc } from '@/lib/ipc'
 import { Switch } from '@/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import type { AppSettings } from '@/types'
+import type { AppSettings, ThemeMode } from '@/types'
+import { applyTheme, persistTheme } from '@/lib/theme'
 import { AboutDialog } from './AboutDialog'
+import ThemeSelector from './ThemeSelector'
 
 // ── Navigation ───────────────────────────────────────────────────
 
 type Section = 'account' | 'general' | 'appearance' | 'keymap' | 'advanced'
 
-const NAV: { id: Section; label: string; icon: typeof IconSettings2; description: string; group?: string }[] = [
-  { id: 'account', label: 'Account', icon: IconUser, description: 'Auth status, login', group: 'account' },
-  { id: 'general', label: 'General', icon: IconSettings2, description: 'CLI path, model, permissions', group: 'settings' },
-  { id: 'appearance', label: 'Appearance', icon: IconPaint, description: 'Theme, font size', group: 'settings' },
-  { id: 'keymap', label: 'Keyboard', icon: IconKeyboard, description: 'Shortcuts reference', group: 'settings' },
-  { id: 'advanced', label: 'Advanced', icon: IconTool, description: 'Data, commits', group: 'settings' },
+const NAV: { id: Section; label: string; icon: typeof IconSettings2; description: string; sectionDescription: string; group?: string }[] = [
+  { id: 'account', label: 'Account', icon: IconUser, description: 'Auth status, login', sectionDescription: 'Manage your authentication and account preferences.', group: 'account' },
+  { id: 'general', label: 'General', icon: IconSettings2, description: 'CLI path, model, permissions', sectionDescription: 'Configure the CLI, default model, and permission behavior.', group: 'settings' },
+  { id: 'appearance', label: 'Appearance', icon: IconPaint, description: 'Theme, font size', sectionDescription: 'Customize the look and feel of Kirodex.', group: 'settings' },
+  { id: 'keymap', label: 'Keyboard', icon: IconKeyboard, description: 'Shortcuts reference', sectionDescription: 'View all available keyboard shortcuts.', group: 'settings' },
+  { id: 'advanced', label: 'Advanced', icon: IconTool, description: 'Data, commits', sectionDescription: 'Privacy, git integration, and data management.', group: 'settings' },
 ]
 
 // ── Keymap data ──────────────────────────────────────────────────
@@ -50,10 +52,13 @@ const KEYMAP: KeymapEntry[] = [
   { group: 'Chat', command: 'Send message', keys: 'Enter' },
   { group: 'Chat', command: 'New line', keys: `${SHIFT}+Enter` },
   { group: 'Chat', command: 'Previous message', keys: '\u2191 (at start)' },
+  { group: 'Chat', command: 'Focus chat input', keys: `${MOD}+L` },
+  { group: 'Chat', command: 'Search messages', keys: `${MOD}+F` },
   { group: 'Chat', command: 'Pause agent', keys: 'Escape (while running)' },
 ]
 
-const FONT_SIZES = [12, 13, 14, 15, 16] as const
+const FONT_SIZE_MIN = 14
+const FONT_SIZE_MAX = 18
 
 // ── Reusable components ──────────────────────────────────────────
 
@@ -65,29 +70,43 @@ interface SettingRowProps {
 }
 
 const SettingRow = ({ label, description, children, className }: SettingRowProps) => (
-  <div className={cn('flex items-center justify-between gap-4 py-2.5', className)}>
+  <div className={cn('flex items-center justify-between gap-4 py-3 transition-colors hover:bg-muted/5 -mx-5 px-5 rounded-lg', className)}>
     <div className="min-w-0 flex-1">
-      <p className="text-[13px] font-medium text-foreground/90">{label}</p>
-      <p className="text-[11px] text-muted-foreground/70">{description}</p>
+      <p className="text-[13px] font-medium text-foreground">{label}</p>
+      <p className="text-[11.5px] leading-relaxed text-muted-foreground/80">{description}</p>
     </div>
     <div className="shrink-0">{children}</div>
   </div>
 )
 
 const SectionLabel = ({ title }: { title: string }) => (
-  <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">{title}</p>
+  <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">{title}</p>
 )
+
+const SectionHeader = ({ section }: { section: Section }) => {
+  const nav = NAV.find((n) => n.id === section)
+  if (!nav) return null
+  return (
+    <div className="mb-6">
+      <div className="flex items-center gap-2.5">
+        <nav.icon className="size-5 text-primary" />
+        <h3 className="text-[17px] font-semibold text-foreground">{nav.label}</h3>
+      </div>
+      <p className="mt-1 text-[12.5px] text-muted-foreground/70">{nav.sectionDescription}</p>
+    </div>
+  )
+}
 
 const SettingsCard = ({ children, className }: { children: React.ReactNode; className?: string }) => (
   <div className={cn(
-    'rounded-xl border border-border/60 bg-card/60 px-5 py-1 transition-colors',
+    'rounded-xl border border-border/50 bg-card/70 px-5 py-1 shadow-sm transition-colors',
     className,
   )}>
     {children}
   </div>
 )
 
-const Divider = () => <div className="border-t border-border/60" />
+const Divider = () => <div className="border-t border-border/40" />
 
 // ── Updates card ─────────────────────────────────────────────────
 
@@ -232,15 +251,32 @@ export const SettingsPanel = () => {
 
   useEffect(() => {
     if (!open) return
-    const onKey = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    const onKey = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') handleClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, setOpen])
 
+  // Live-preview theme changes while settings is open
+  useEffect(() => {
+    if (!open) return
+    const mode = draft.theme ?? 'dark'
+    applyTheme(mode)
+  }, [open, draft.theme])
+
   const handleSave = useCallback(() => {
+    const mode = draft.theme ?? 'dark'
+    persistTheme(mode)
+    applyTheme(mode)
     saveSettings(draft)
     setOpen(false)
   }, [draft, saveSettings, setOpen])
+
+  // Revert theme on cancel / close without saving
+  const handleClose = useCallback(() => {
+    const savedMode = settings.theme ?? 'dark'
+    applyTheme(savedMode)
+    setOpen(false)
+  }, [settings.theme, setOpen])
 
   const testCli = useCallback(async () => {
     setCliStatus('idle')
@@ -289,14 +325,14 @@ export const SettingsPanel = () => {
                   className={cn(
                     'relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-all',
                     section === item.id
-                      ? 'bg-accent text-foreground'
+                      ? 'bg-primary/10 text-foreground shadow-sm'
                       : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
                   )}
                 >
                   {section === item.id && (
-                    <div className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-primary" />
+                    <div className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-primary" />
                   )}
-                  <item.icon className={cn('size-4 shrink-0', section === item.id && 'text-primary')} />
+                  <item.icon className={cn('size-4 shrink-0', section === item.id ? 'text-primary' : 'opacity-60')} />
                   <div className="min-w-0">
                     <p className="text-[13px] font-medium leading-tight">{item.label}</p>
                     <p className="truncate text-[10px] opacity-50">{item.description}</p>
@@ -306,22 +342,21 @@ export const SettingsPanel = () => {
             ))}
           </div>
 
-          <div className="mt-auto px-3 pt-4 border-t border-border/60 space-y-3">
+          <div className="mt-auto px-3 pt-4 border-t border-border/40 space-y-2">
             <button
-              onClick={() => setOpen(false)}
+              onClick={handleClose}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <IconArrowLeft className="size-4" />
               Back
             </button>
-            <div className="flex items-center justify-between px-3">
+            <div className="flex items-center justify-between px-3 py-1">
               <button
                 type="button"
                 onClick={() => setIsAboutOpen(true)}
                 className="text-left transition-colors hover:text-foreground"
               >
-                <p className="text-[10px] text-muted-foreground/60">Kirodex {appVersion ? `v${appVersion}` : ''}</p>
-                <p className="text-[10px] text-muted-foreground/60">Copyright © 2026 Thabti</p>
+                <p className="text-[10px] text-muted-foreground/50">Kirodex {appVersion ? `v${appVersion}` : ''}</p>
               </button>
               <a
                 href="https://github.com/thabti/kirodex"
@@ -329,9 +364,9 @@ export const SettingsPanel = () => {
                 rel="noopener noreferrer"
                 aria-label="Kirodex on GitHub"
                 tabIndex={0}
-                className="text-muted-foreground/60 transition-colors hover:text-foreground"
+                className="text-muted-foreground/40 transition-colors hover:text-foreground"
               >
-                <IconBrandGithub className="size-4" />
+                <IconBrandGithub className="size-3.5" />
               </a>
             </div>
           </div>
@@ -340,11 +375,15 @@ export const SettingsPanel = () => {
         {/* ── Main content ── */}
         <div className="flex flex-1 flex-col min-h-0">
           {/* Top bar */}
-          <div className="flex h-12 shrink-0 items-center justify-between px-6 pt-4">
-            <div />
+          <div className="flex h-14 shrink-0 items-center justify-between border-b border-border/30 px-6">
+            <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground/60">
+              <span>Settings</span>
+              <span>/</span>
+              <span className="text-foreground/80 font-medium">{NAV.find((n) => n.id === section)?.label}</span>
+            </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setOpen(false)}
+                onClick={handleClose}
                 className="rounded-lg border border-border/50 px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 Cancel
@@ -359,7 +398,7 @@ export const SettingsPanel = () => {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => setOpen(false)}
+                    onClick={handleClose}
                     data-testid="settings-close-button"
                     className="ml-1 flex size-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
                   >
@@ -378,7 +417,7 @@ export const SettingsPanel = () => {
               {/* ── Account ── */}
               {section === 'account' && (
                 <>
-                  <SectionLabel title="Account" />
+                  <SectionHeader section="account" />
                   <SettingsCard>
                     {kiroAuth ? (
                       <SettingRow
@@ -416,67 +455,71 @@ export const SettingsPanel = () => {
               {/* ── General ── */}
               {section === 'general' && (
                 <>
-                  {/* CLI + Model */}
+                  <SectionHeader section="general" />
+
+                  {/* Connection */}
                   <div>
-                    <SectionLabel title="CLI and model" />
-                    <SettingsCard className="!py-4 space-y-4">
-                      <div>
-                        <label className="mb-1.5 block text-[12px] font-medium text-foreground/70">kiro-cli path</label>
-                        <div className="flex gap-2">
-                          <input
-                            value={draft.kiroBin}
-                            data-testid="settings-cli-path-input"
-                            onChange={(e) => updateDraft({ kiroBin: e.target.value })}
-                            placeholder="kiro-cli"
-                            className="flex h-8 w-full flex-1 rounded-lg border border-input bg-background/50 px-3 font-mono text-sm placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                          />
-                          <button onClick={browseCli} className="shrink-0 rounded-lg border border-input px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent">Browse</button>
-                          <button
-                            onClick={handleAutoDetect}
-                            disabled={isDetecting}
-                            className="flex shrink-0 items-center gap-1 rounded-lg border border-input px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-                          >
-                            {isDetecting ? <IconLoader2 className="size-3 animate-spin" /> : <IconSearch className="size-3" />}
-                            Detect
-                          </button>
-                        </div>
-                        <div className="mt-2 flex items-center gap-2">
-                          <button onClick={testCli} className="rounded-lg border border-input px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent">Test</button>
-                          {cliStatus === 'ok' && <span className="flex items-center gap-1 text-xs text-emerald-400"><IconCheck className="size-3" /> Connected</span>}
-                          {cliStatus === 'fail' && <span className="flex items-center gap-1 text-xs text-red-400"><IconAlertCircle className="size-3" /> Failed</span>}
-                        </div>
+                    <SectionLabel title="Connection" />
+                    <SettingsCard className="!py-4">
+                      <label className="mb-1.5 block text-[12px] font-medium text-foreground/70">kiro-cli path</label>
+                      <div className="flex gap-2">
+                        <input
+                          value={draft.kiroBin}
+                          data-testid="settings-cli-path-input"
+                          onChange={(e) => updateDraft({ kiroBin: e.target.value })}
+                          placeholder="kiro-cli"
+                          className="flex h-8 w-full flex-1 rounded-lg border border-input bg-background/50 px-3 font-mono text-sm placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        />
+                        <button onClick={browseCli} className="shrink-0 rounded-lg border border-input px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent">Browse</button>
+                        <button
+                          onClick={handleAutoDetect}
+                          disabled={isDetecting}
+                          className="flex shrink-0 items-center gap-1 rounded-lg border border-input px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+                        >
+                          {isDetecting ? <IconLoader2 className="size-3 animate-spin" /> : <IconSearch className="size-3" />}
+                          Detect
+                        </button>
                       </div>
-                      <Divider />
-                      <div>
-                        <label className="mb-1.5 block text-[12px] font-medium text-foreground/70">Default model</label>
-                        <div className="flex gap-2">
-                          <div className="relative flex-1">
-                            <select
-                              value={draft.defaultModel ?? currentModelId ?? ''}
-                              onChange={(e) => updateDraft({ defaultModel: e.target.value || null })}
-                              disabled={modelsLoading || availableModels.length === 0}
-                              className={cn(
-                                'flex h-8 w-full appearance-none rounded-lg border border-input bg-background/50 px-3 pr-8 text-sm',
-                                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-                                'disabled:cursor-not-allowed disabled:opacity-50',
-                              )}
-                            >
-                              {availableModels.length === 0 && !modelsLoading && <option value="">No models loaded</option>}
-                              {modelsLoading && <option value="">Loading…</option>}
-                              {availableModels.map((m) => <option key={m.modelId} value={m.modelId}>{m.name}</option>)}
-                            </select>
-                            <IconChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/70" />
-                          </div>
-                          <button
-                            onClick={() => fetchModels(draft.kiroBin)}
-                            disabled={modelsLoading}
-                            className="flex shrink-0 items-center gap-1 rounded-lg border border-input px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-                          >
-                            {modelsLoading ? <><IconLoader2 className="size-3 animate-spin" /> Loading…</> : 'Refresh'}
-                          </button>
-                        </div>
-                        {modelsError && <span className="mt-1.5 flex items-center gap-1 text-xs text-red-400"><IconAlertCircle className="size-3" /> {modelsError}</span>}
+                      <div className="mt-2 flex items-center gap-2">
+                        <button onClick={testCli} className="rounded-lg border border-input px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent">Test connection</button>
+                        {cliStatus === 'ok' && <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400"><IconCheck className="size-3" /> Connected</span>}
+                        {cliStatus === 'fail' && <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400"><IconAlertCircle className="size-3" /> Failed</span>}
                       </div>
+                    </SettingsCard>
+                  </div>
+
+                  {/* Model */}
+                  <div>
+                    <SectionLabel title="Model" />
+                    <SettingsCard className="!py-4">
+                      <label className="mb-1.5 block text-[12px] font-medium text-foreground/70">Default model</label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <select
+                            value={draft.defaultModel ?? currentModelId ?? ''}
+                            onChange={(e) => updateDraft({ defaultModel: e.target.value || null })}
+                            disabled={modelsLoading || availableModels.length === 0}
+                            className={cn(
+                              'flex h-8 w-full appearance-none rounded-lg border border-input bg-background/50 px-3 pr-8 text-sm',
+                              'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                              'disabled:cursor-not-allowed disabled:opacity-50',
+                            )}
+                          >
+                            {availableModels.length === 0 && !modelsLoading && <option value="">No models loaded</option>}
+                            {modelsLoading && <option value="">Loading…</option>}
+                            {availableModels.map((m) => <option key={m.modelId} value={m.modelId}>{m.name}</option>)}
+                          </select>
+                          <IconChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/70" />
+                        </div>
+                        <button
+                          onClick={() => fetchModels(draft.kiroBin)}
+                          disabled={modelsLoading}
+                          className="flex shrink-0 items-center gap-1 rounded-lg border border-input px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+                        >
+                          {modelsLoading ? <><IconLoader2 className="size-3 animate-spin" /> Loading…</> : <><IconRefresh className="size-3" /> Refresh</>}
+                        </button>
+                      </div>
+                      {modelsError && <span className="mt-1.5 flex items-center gap-1 text-xs text-red-600 dark:text-red-400"><IconAlertCircle className="size-3" /> {modelsError}</span>}
                     </SettingsCard>
                   </div>
 
@@ -499,12 +542,27 @@ export const SettingsPanel = () => {
                           aria-label="Toggle respect gitignore"
                         />
                       </SettingRow>
-                      <Divider />
-                      <SettingRow label="Notifications" description="Notify when the agent finishes in the background">
+                    </SettingsCard>
+                  </div>
+
+                  {/* Notifications */}
+                  <div>
+                    <SectionLabel title="Notifications" />
+                    <SettingsCard>
+                      <SettingRow label="Desktop notifications" description="Notify when the agent finishes, errors, or needs approval in the background">
                         <Switch
                           checked={draft.notifications ?? true}
                           onCheckedChange={(checked) => updateDraft({ notifications: checked })}
                           aria-label="Toggle desktop notifications"
+                        />
+                      </SettingRow>
+                      <Divider />
+                      <SettingRow label="Notification sound" description="Play a chime when a notification is sent">
+                        <Switch
+                          checked={draft.soundNotifications ?? true}
+                          onCheckedChange={(checked) => updateDraft({ soundNotifications: checked })}
+                          disabled={!(draft.notifications ?? true)}
+                          aria-label="Toggle notification sound"
                         />
                       </SettingRow>
                     </SettingsCard>
@@ -523,51 +581,39 @@ export const SettingsPanel = () => {
               {/* ── Appearance ── */}
               {section === 'appearance' && (
                 <>
+                  <SectionHeader section="appearance" />
                   <div>
                     <SectionLabel title="Theme" />
                     <SettingsCard className="!py-4">
-                      <div className="flex gap-2">
-                        {(['Dark', 'Light', 'System'] as const).map((theme) => (
-                          <button
-                            key={theme}
-                            disabled={theme !== 'Dark'}
-                            className={cn(
-                              'flex-1 rounded-lg border px-4 py-3 text-center text-xs font-medium transition-colors',
-                              theme === 'Dark'
-                                ? 'border-primary bg-primary/10 text-primary'
-                                : 'cursor-not-allowed border-border/60 text-muted-foreground/50',
-                            )}
-                          >
-                            {theme}
-                            {theme !== 'Dark' && <span className="ml-1 text-[9px]">(soon)</span>}
-                          </button>
-                        ))}
-                      </div>
+                      <ThemeSelector
+                        value={draft.theme ?? 'dark'}
+                        onChange={(mode) => updateDraft({ theme: mode })}
+                      />
                     </SettingsCard>
                   </div>
 
                   <div>
                     <SectionLabel title="Font size" />
                     <SettingsCard className="!py-4">
-                      <div className="flex gap-2">
-                        {FONT_SIZES.map((s) => (
-                          <button
-                            key={s}
-                            onClick={() => updateDraft({ fontSize: s })}
-                            className={cn(
-                              'flex-1 rounded-lg border py-2.5 text-center text-sm font-medium transition-colors',
-                              draft.fontSize === s
-                                ? 'border-primary bg-primary/10 text-primary'
-                                : 'border-border/60 text-muted-foreground/60 hover:bg-accent hover:text-foreground',
-                            )}
-                          >
-                            {s}
-                          </button>
-                        ))}
+                      <div className="flex items-center gap-4">
+                        <span className="text-[11px] font-medium text-muted-foreground/60 tabular-nums">{FONT_SIZE_MIN}</span>
+                        <input
+                          type="range"
+                          min={FONT_SIZE_MIN}
+                          max={FONT_SIZE_MAX}
+                          step={1}
+                          value={draft.fontSize ?? 14}
+                          onChange={(e) => updateDraft({ fontSize: Number(e.target.value) })}
+                          aria-label="Font size"
+                          className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-border/60 accent-primary [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-sm"
+                        />
+                        <span className="text-[11px] font-medium text-muted-foreground/60 tabular-nums">{FONT_SIZE_MAX}</span>
+                        <span className="min-w-[3ch] text-center text-sm font-semibold tabular-nums text-primary">{draft.fontSize ?? 14}</span>
                       </div>
-                      <p className="mt-3 text-[12px] text-muted-foreground/70">
-                        Preview: <span style={{ fontSize: draft.fontSize }}>The quick brown fox jumps over the lazy dog</span>
-                      </p>
+                      <div className="mt-3 rounded-lg border border-border/30 bg-background/50 px-4 py-3">
+                        <p className="text-[11px] font-medium text-muted-foreground/50 mb-1.5">Preview</p>
+                        <p className="text-foreground/80 leading-relaxed" style={{ fontSize: draft.fontSize }}>The quick brown fox jumps over the lazy dog</p>
+                      </div>
                     </SettingsCard>
                   </div>
 
@@ -606,7 +652,7 @@ export const SettingsPanel = () => {
 
                 return (
                   <>
-                    <SectionLabel title="Keyboard shortcuts" />
+                    <SectionHeader section="keymap" />
 
                     <div className="relative">
                       <IconSearch className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/60" />
@@ -633,8 +679,8 @@ export const SettingsPanel = () => {
                         </div>
                         <SettingsCard className="divide-y divide-border/30 !p-0 overflow-hidden">
                           {filtered.filter((e) => e.group === group).map((entry) => (
-                            <div key={entry.command} className="flex items-center justify-between px-5 py-2.5 transition-colors hover:bg-muted/10">
-                              <span className="text-[13px] text-foreground/80">{entry.command}</span>
+                            <div key={entry.command} className="flex items-center justify-between px-5 py-2.5 transition-colors hover:bg-muted/15">
+                              <span className="text-[13px] text-foreground/90">{entry.command}</span>
                               <kbd className="shrink-0 rounded-md border border-border/60 bg-muted/50 px-2 py-1 font-mono text-[11px] text-muted-foreground/70 shadow-sm">
                                 {entry.keys}
                               </kbd>
@@ -650,6 +696,7 @@ export const SettingsPanel = () => {
               {/* ── Advanced ── */}
               {section === 'advanced' && (
                 <>
+                  <SectionHeader section="advanced" />
                   <div>
                     <SectionLabel title="Privacy" />
                     <SettingsCard>
@@ -677,7 +724,7 @@ export const SettingsPanel = () => {
                         />
                       </SettingRow>
                       <Divider />
-                      <SettingRow label="Task completion report" description="JSON summary card when a task finishes">
+                      <SettingRow label="Task completion report" description="Summary card when a task finishes">
                         <Switch
                           checked={draft.coAuthorJsonReport ?? true}
                           onCheckedChange={(checked) => updateDraft({ coAuthorJsonReport: checked })}
@@ -693,11 +740,26 @@ export const SettingsPanel = () => {
                       <SettingRow label="Conversation history" description="Threads are saved between sessions">
                         <button
                           type="button"
-                          onClick={() => { useTaskStore.getState().clearHistory(); setOpen(false) }}
+                          onClick={() => { useTaskStore.getState().clearHistory(); handleClose() }}
                           className="flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
                         >
                           <IconTrash className="size-3" />
                           Clear history
+                        </button>
+                      </SettingRow>
+                      <Divider />
+                      <SettingRow label="Replay onboarding" description="Run the setup wizard again">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const store = useSettingsStore.getState()
+                            await store.saveSettings({ ...store.settings, hasOnboarded: false })
+                            handleClose()
+                          }}
+                          className="flex items-center gap-1.5 rounded-lg border border-input px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
+                        >
+                          <IconRefresh className="size-3" />
+                          Replay
                         </button>
                       </SettingRow>
                     </SettingsCard>

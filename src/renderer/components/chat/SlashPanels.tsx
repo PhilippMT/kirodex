@@ -283,7 +283,7 @@ const AgentListPanel = memo(function AgentListPanel({ onDismiss }: { onDismiss: 
 // ── Shared panel shell ──────────────────────────────────────────────
 function PanelShell({ children, onDismiss }: { children: React.ReactNode; onDismiss?: () => void }) {
   return (
-    <div className="absolute bottom-full left-0 right-0 z-[300] mb-2 overflow-hidden rounded-xl border border-border bg-popover shadow-xl">
+    <div className="absolute bottom-full left-0 right-0 z-[300] mb-2 overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-xl ring-1 ring-black/5 dark:ring-white/5 floating-panel">
       {onDismiss && (
         <div className="flex items-center justify-end px-2 pt-1.5">
           <button

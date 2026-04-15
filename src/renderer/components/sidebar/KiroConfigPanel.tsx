@@ -81,7 +81,7 @@ function getRoleIcon(name: string): { icon: ElementType; color: string } {
   if (n.includes('code-review'))   return { icon: IconShield,     color: 'text-rose-400' }
   if (n.includes('documentation')) return { icon: IconBook,       color: 'text-blue-400' }
   if (n.includes('senior'))        return { icon: IconPalette,    color: 'text-teal-400' }
-  if (n.includes('expert'))        return { icon: IconRocket,     color: 'text-amber-300' }
+  if (n.includes('expert'))        return { icon: IconRocket,     color: 'text-amber-600 dark:text-amber-300' }
   return { icon: IconRobot, color: 'text-muted-foreground/70' }
 }
 

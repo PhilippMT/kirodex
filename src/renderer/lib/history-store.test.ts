@@ -16,8 +16,8 @@ vi.mock('@tauri-apps/plugin-store', () => ({
   },
 }))
 
-import { loadThreads, loadProjects, saveThreads, toArchivedTasks, clearHistory } from './history-store'
-import type { AgentTask } from '@/types'
+import { loadThreads, loadProjects, saveThreads, toArchivedTasks, clearHistory, loadSoftDeleted, saveSoftDeleted } from './history-store'
+import type { AgentTask, SoftDeletedThread } from '@/types'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -181,10 +181,41 @@ describe('toArchivedTasks', () => {
 })
 
 describe('clearHistory', () => {
-  it('deletes threads and projects then saves', async () => {
+  it('deletes threads, projects, and softDeleted then saves', async () => {
     await clearHistory()
     expect(mockDelete).toHaveBeenCalledWith('threads')
     expect(mockDelete).toHaveBeenCalledWith('projects')
+    expect(mockDelete).toHaveBeenCalledWith('softDeleted')
     expect(mockSave).toHaveBeenCalledOnce()
+  })
+})
+
+describe('loadSoftDeleted', () => {
+  it('returns empty array when store has no soft-deleted threads', async () => {
+    mockGet.mockResolvedValue(null)
+    const actual = await loadSoftDeleted()
+    expect(actual).toEqual([])
+    expect(mockGet).toHaveBeenCalledWith('softDeleted')
+  })
+
+  it('returns stored soft-deleted threads', async () => {
+    const expected: SoftDeletedThread[] = [{
+      task: { id: 't1', name: 'Deleted', workspace: '/ws', status: 'completed', createdAt: '', messages: [] },
+      deletedAt: '2026-04-15T10:00:00Z',
+    }]
+    mockGet.mockResolvedValue(expected)
+    const actual = await loadSoftDeleted()
+    expect(actual).toEqual(expected)
+  })
+})
+
+describe('saveSoftDeleted', () => {
+  it('persists soft-deleted threads to the store', async () => {
+    const items: SoftDeletedThread[] = [{
+      task: { id: 't1', name: 'Deleted', workspace: '/ws', status: 'completed', createdAt: '', messages: [] },
+      deletedAt: '2026-04-15T10:00:00Z',
+    }]
+    await saveSoftDeleted(items)
+    expect(mockSet).toHaveBeenCalledWith('softDeleted', items)
   })
 })

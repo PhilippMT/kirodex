@@ -174,7 +174,7 @@ export const BranchSelector = memo(function BranchSelector({ workspace }: Branch
         data-testid="branch-selector-button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'flex items-center gap-1 rounded-lg px-1.5 py-1 text-[11px] font-medium transition-colors',
+          'flex items-center gap-1 rounded-lg px-1.5 py-1 text-[14px] font-medium transition-colors',
           'text-muted-foreground/60 hover:text-foreground/80',
           open && 'text-foreground/80',
         )}
