@@ -1,5 +1,21 @@
 # Activity Log
 
+## 2026-04-16 12:52 GST (Dubai)
+
+### ACP/Chat: friendly error messages for model permission and access errors
+
+Added `friendly_prompt_error()` in the Rust backend that detects common model/permission error patterns (AccessDeniedException, UnauthorizedException, ThrottlingException, ValidationException, ResourceNotFoundException, ModelErrorException) and appends actionable tips. Improved `SystemMessageRow` to render multi-line errors with tips as a proper error card (destructive border/bg, left-aligned, readable) instead of the tiny centered muted text.
+
+**Modified:** `src-tauri/src/commands/acp.rs`, `src/renderer/components/chat/SystemMessageRow.tsx`
+
+## 2026-04-16 12:39 GST (Dubai)
+
+### Website: add features section and brew install terminal block
+
+Added "Everything you need to ship with AI" features grid (six cards: agentic chat, inline diffs, git, terminal, plan mode, native performance) between the hero and footer. Added a terminal-style brew install block with traffic-light dots and a copy button below the download CTA.
+
+**Modified:** `website/index.html`
+
 ## 2026-04-16 12:00 GST (Dubai)
 
 ### Website: adopt minimal t3-style layout with big hero image
