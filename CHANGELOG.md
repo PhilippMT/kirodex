@@ -1,5 +1,27 @@
 # Changelog
 
+## [v0.11.0] - 2026-04-16
+
+### Features
+
+- add features section and brew install terminal block
+- adopt minimal website (#13)
+
+### Bug fixes
+
+- auto-retry on refusal and improved error display
+- friendly error messages for model errors and filter agent-switch noise
+- friendly error messages for model permission and access errors
+
+### Documentation
+
+- update activity log
+- update activity log
+
+### Chores
+
+- update downloads.json
+
 ## [v0.10.1] - 2026-04-16
 
 ### Features
