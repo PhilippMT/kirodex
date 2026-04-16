@@ -1,5 +1,29 @@
 # Activity Log
 
+## 2026-04-16 13:05 GST (Dubai)
+
+### Chat: handle refusal gracefully with auto-retry and recovery
+
+Changed refusal handling so the user isn't stuck. Previously, a `stopReason: "refusal"` set the task status to `error`, which felt like a dead end. Now: (1) On first refusal, the system message says "Retrying automatically…" and the last user message is re-sent to the backend. (2) On second consecutive refusal, the retry tracker resets and the message says "You can try rephrasing your request or sending a new message." (3) Task status is always set to `paused` (not `error`) after a refusal, so the chat input stays active and the user can immediately send a new message. Updated 2 existing tests and added 1 new test. All 666 frontend tests and 96 Rust tests pass.
+
+**Modified:** `src/renderer/stores/taskStore.ts`, `src/renderer/stores/taskStore.test.ts`
+
+## 2026-04-16 12:59 GST (Dubai)
+
+### ACP: add unit tests for friendly_prompt_error
+
+Added 12 unit tests covering all branches of `friendly_prompt_error`: AccessDeniedException, access denied (lowercase), UnauthorizedException, security token, ThrottlingException, too many requests, ValidationException, ResourceNotFoundException, ModelErrorException, ServiceException, unknown error passthrough, and original message preservation. All 96 Rust tests pass.
+
+**Modified:** `src-tauri/src/commands/acp.rs`
+
+## 2026-04-16 12:57 GST (Dubai)
+
+### ACP: filter agent-switch system messages from chat stream
+
+Filtered "Agent changed to ..." messages from being forwarded as `message_chunk` events. These are kiro-cli system notifications about agent switching (e.g., between `kiro_planner` and `kiro_default`), not real assistant content. When agent switches loop rapidly, these messages cluttered the chat with repeated "Agent changed to kiro_planner" / "Agent changed to kiro_default" lines.
+
+**Modified:** `src-tauri/src/commands/acp.rs`
+
 ## 2026-04-16 12:52 GST (Dubai)
 
 ### ACP/Chat: friendly error messages for model permission and access errors
