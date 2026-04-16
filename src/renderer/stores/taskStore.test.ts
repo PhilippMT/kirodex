@@ -501,17 +501,25 @@ describe('applyTurnEnd', () => {
     expect(result.tasks?.['t1'].status).toBe('paused')
   })
 
-  it('sets status to error on refusal', () => {
+  it('sets status to paused on refusal (user can recover)', () => {
     const result = applyTurnEnd(baseState(), 't1', 'refusal')
-    expect(result.tasks?.['t1'].status).toBe('error')
+    expect(result.tasks?.['t1'].status).toBe('paused')
   })
 
-  it('appends system error message on refusal', () => {
-    const result = applyTurnEnd(baseState(), 't1', 'refusal')
+  it('appends retry system message on refusal with refusalRetry=true', () => {
+    const result = applyTurnEnd(baseState(), 't1', 'refusal', true)
     const messages = result.tasks?.['t1'].messages ?? []
     const systemMsg = messages.find((m) => m.role === 'system')
     expect(systemMsg).toBeDefined()
-    expect(systemMsg?.content).toContain('refused to continue')
+    expect(systemMsg?.content).toContain('Retrying automatically')
+  })
+
+  it('appends rephrase system message on refusal with refusalRetry=false', () => {
+    const result = applyTurnEnd(baseState(), 't1', 'refusal', false)
+    const messages = result.tasks?.['t1'].messages ?? []
+    const systemMsg = messages.find((m) => m.role === 'system')
+    expect(systemMsg).toBeDefined()
+    expect(systemMsg?.content).toContain('try rephrasing')
   })
 
   it('does not append system message on normal end_turn', () => {

@@ -907,6 +907,7 @@ export const applyTurnEnd = (
   s: Pick<TaskStore, 'tasks' | 'streamingChunks' | 'thinkingChunks' | 'liveToolCalls'>,
   taskId: string,
   stopReason?: string,
+  refusalRetry?: boolean,
 ): Partial<TaskStore> => {
   const chunk = s.streamingChunks[taskId] ?? ''
   const thinking = s.thinkingChunks[taskId] ?? ''
@@ -928,15 +929,19 @@ export const applyTurnEnd = (
     })
   }
   if (stopReason === 'refusal') {
+    const msg = refusalRetry
+      ? '\u26a0\ufe0f The agent refused to continue. Retrying automatically\u2026'
+      : '\u26a0\ufe0f The agent refused to continue. You can try rephrasing your request or sending a new message.'
     newMessages.push({
       role: 'system' as const,
-      content: '\u26a0\ufe0f The agent refused to continue. This can happen when the request conflicts with safety guidelines or the agent cannot proceed.',
+      content: msg,
       timestamp: new Date().toISOString(),
     })
   }
   const updatedTask: AgentTask = {
     ...task,
-    status: stopReason === 'refusal' ? 'error' : 'paused',
+    // On refusal: stay 'paused' so the user can send new messages (not 'error' which feels stuck)
+    status: stopReason === 'refusal' ? 'paused' : 'paused',
     messages: newMessages,
     pendingPermission: undefined,
   }
@@ -1020,6 +1025,9 @@ export function initTaskListeners(): () => void {
     useTaskStore.getState().updateUsage(taskId, used, size)
   })
 
+  // Track refusal retries per task — allows one automatic retry before giving up
+  const refusalRetried: Record<string, boolean> = {}
+
   const unsub8 = ipc.onTurnEnd(({ taskId, stopReason }) => {
     // Flush any pending rAF-buffered chunks synchronously so turn_end sees them
     if (chunkBuf[taskId] || Object.keys(chunkBuf).length > 0) {
@@ -1030,6 +1038,56 @@ export function initTaskListeners(): () => void {
       if (thinkRaf) { cancelAnimationFrame(thinkRaf); thinkRaf = null }
       flushThinking()
     }
+
+    // On refusal: auto-retry once, then give up and let the user send a new message
+    if (stopReason === 'refusal') {
+      const alreadyRetried = !!refusalRetried[taskId]
+
+      // Apply turn end with retry flag so the system message is appropriate
+      useTaskStore.setState((s) => applyTurnEnd(s, taskId, stopReason, !alreadyRetried))
+      useTaskStore.getState().persistHistory()
+
+      if (!alreadyRetried) {
+        // First refusal: mark as retried and auto-retry the last user message
+        refusalRetried[taskId] = true
+        const task = useTaskStore.getState().tasks[taskId]
+        if (task) {
+          // Find the last user message to retry
+          const lastUserMsg = [...task.messages].reverse().find((m) => m.role === 'user')
+          if (lastUserMsg) {
+            useTaskStore.getState().upsertTask({ ...task, status: 'running' })
+            useTaskStore.getState().clearTurn(taskId)
+            ipc.sendMessage(taskId, lastUserMsg.content)
+            return // skip notification and queue processing — we're retrying
+          }
+        }
+      } else {
+        // Second refusal: reset the retry tracker and let the user recover
+        delete refusalRetried[taskId]
+      }
+
+      // Notify on refusal (only if we didn't auto-retry)
+      const settings = useSettingsStore.getState().settings
+      const task = useTaskStore.getState().tasks[taskId]
+      if (task) {
+        sendTaskNotification({
+          task,
+          status: 'error',
+          isNotificationsEnabled: settings.notifications ?? true,
+          isSoundEnabled: settings.soundNotifications ?? true,
+          onNotified: (tid) => {
+            useTaskStore.setState((s) => ({
+              notifiedTaskIds: s.notifiedTaskIds.includes(tid) ? s.notifiedTaskIds : [...s.notifiedTaskIds, tid],
+            }))
+          },
+        })
+      }
+      return // don't process queue on refusal
+    }
+
+    // Non-refusal turn end: clear any refusal tracker for this task
+    delete refusalRetried[taskId]
+
     // Use a single setState to avoid stale reads between getState() calls
     useTaskStore.setState((s) => applyTurnEnd(s, taskId, stopReason))
 
@@ -1040,7 +1098,7 @@ export function initTaskListeners(): () => void {
     const settings = useSettingsStore.getState().settings
     const task = useTaskStore.getState().tasks[taskId]
     if (task) {
-      const notifStatus = stopReason === 'refusal' || task.status === 'error' ? 'error' : 'completed'
+      const notifStatus = task.status === 'error' ? 'error' : 'completed'
       sendTaskNotification({
         task,
         status: notifStatus,
