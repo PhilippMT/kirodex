@@ -291,7 +291,8 @@ impl acp::Client for KirodexClient {
                     .and_then(|c| c.get("text"))
                     .and_then(|t| t.as_str())
                     .unwrap_or("");
-                if !text.is_empty() {
+                // Filter out agent-switch system messages — these are not real assistant content
+                if !text.is_empty() && !text.starts_with("Agent changed to ") {
                     let _ = self.app.emit("message_chunk", serde_json::json!({
                         "taskId": tid, "chunk": text
                     }));
@@ -1701,5 +1702,93 @@ mod tests {
         allowed.insert("/Users/me/project/src/deep/file.rs".to_string());
         // The parent directory of the mentioned file
         assert!(is_path_allowed(&allowed, "/Users/me/project/src/deep/other.rs"));
+    }
+
+    // ── friendly_prompt_error ───────────────────────────────────────
+
+    #[test]
+    fn friendly_error_access_denied() {
+        let msg = friendly_prompt_error("AccessDeniedException: User is not authorized");
+        assert!(msg.contains("AccessDeniedException"));
+        assert!(msg.contains("Tip:"));
+        assert!(msg.contains("bedrock:InvokeModel"));
+    }
+
+    #[test]
+    fn friendly_error_access_denied_lowercase() {
+        let msg = friendly_prompt_error("access denied for model invocation");
+        assert!(msg.contains("Tip:"));
+        assert!(msg.contains("IAM"));
+    }
+
+    #[test]
+    fn friendly_error_unauthorized() {
+        let msg = friendly_prompt_error("UnauthorizedException: The security token is expired");
+        assert!(msg.contains("Tip:"));
+        assert!(msg.contains("aws sso login"));
+    }
+
+    #[test]
+    fn friendly_error_security_token() {
+        let msg = friendly_prompt_error("The security token included in the request is invalid");
+        assert!(msg.contains("Tip:"));
+        assert!(msg.contains("credentials"));
+    }
+
+    #[test]
+    fn friendly_error_throttling() {
+        let msg = friendly_prompt_error("ThrottlingException: Rate exceeded");
+        assert!(msg.contains("Tip:"));
+        assert!(msg.contains("rate limit"));
+    }
+
+    #[test]
+    fn friendly_error_too_many_requests() {
+        let msg = friendly_prompt_error("Too many requests, please slow down");
+        assert!(msg.contains("Tip:"));
+        assert!(msg.contains("rate limit"));
+    }
+
+    #[test]
+    fn friendly_error_validation() {
+        let msg = friendly_prompt_error("ValidationException: input is too long");
+        assert!(msg.contains("Tip:"));
+        assert!(msg.contains("prompt is too large"));
+    }
+
+    #[test]
+    fn friendly_error_resource_not_found() {
+        let msg = friendly_prompt_error("ResourceNotFoundException: model not available");
+        assert!(msg.contains("Tip:"));
+        assert!(msg.contains("Bedrock console"));
+    }
+
+    #[test]
+    fn friendly_error_model_error() {
+        let msg = friendly_prompt_error("ModelErrorException: internal failure");
+        assert!(msg.contains("Tip:"));
+        assert!(msg.contains("temporary"));
+    }
+
+    #[test]
+    fn friendly_error_service_exception() {
+        let msg = friendly_prompt_error("ServiceException: something went wrong");
+        assert!(msg.contains("Tip:"));
+        assert!(msg.contains("temporary"));
+    }
+
+    #[test]
+    fn friendly_error_unknown_passes_through() {
+        let raw = "some unknown error happened";
+        let msg = friendly_prompt_error(raw);
+        assert_eq!(msg, raw);
+        assert!(!msg.contains("Tip:"));
+    }
+
+    #[test]
+    fn friendly_error_preserves_original_message() {
+        let raw = "AccessDeniedException: User arn:aws:iam::123:user/dev is not authorized";
+        let msg = friendly_prompt_error(raw);
+        assert!(msg.starts_with(raw));
     }
 }
