@@ -13,6 +13,7 @@ import { ProjectItem } from './ProjectItem'
 import { SidebarFooter } from './SidebarFooter'
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'created', label: 'Created' },
   { key: 'recent', label: 'Recent' },
   { key: 'oldest', label: 'Oldest' },
   { key: 'name-asc', label: 'Name A–Z' },
@@ -73,7 +74,7 @@ interface TaskSidebarProps {
 
 export const TaskSidebar = memo(function TaskSidebar({ width, onResize, position = 'left' }: TaskSidebarProps) {
   const isRight = position === 'right'
-  const [sort, setSort] = useState<SortKey>('recent')
+  const [sort, setSort] = useState<SortKey>('created')
   const projectList = useSidebarTasks(sort)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
   const dragSrcIdx = useRef<number | null>(null)

@@ -16,7 +16,7 @@ export interface SidebarTask {
   readonly originalWorkspace?: string
 }
 
-export type SortKey = 'recent' | 'oldest' | 'name-asc' | 'name-desc'
+export type SortKey = 'created' | 'recent' | 'oldest' | 'name-asc' | 'name-desc'
 
 export interface SidebarProject {
   readonly name: string
@@ -25,6 +25,7 @@ export interface SidebarProject {
 }
 
 function sortTasks(tasks: readonly SidebarTask[], sort: SortKey): SidebarTask[] {
+  if (sort === 'created') return [...tasks]
   return [...tasks].sort((a, b) => {
     if (sort === 'name-asc') return a.name.localeCompare(b.name)
     if (sort === 'name-desc') return b.name.localeCompare(a.name)
