@@ -373,20 +373,16 @@ pub struct GitDiffStats {
 pub fn git_diff_stats(cwd: String) -> Result<GitDiffStats, AppError> {
     let repo = Repository::open(&cwd)?;
     let head_tree = repo.head().ok().and_then(|h| h.peel_to_tree().ok());
+    // Merge staged + unstaged into one diff so files appearing in both are
+    // counted once, matching the combined patch the diff panel displays.
+    let mut combined = repo.diff_tree_to_index(head_tree.as_ref(), None, None)?;
+    let unstaged = repo.diff_index_to_workdir(None, None)?;
+    combined.merge(&unstaged)?;
     let mut stats = GitDiffStats { additions: 0, deletions: 0, file_count: 0 };
-    let count = |diff: git2::Diff, s: &mut GitDiffStats| {
-        let ds = diff.stats().ok();
-        if let Some(ds) = ds {
-            s.additions += ds.insertions() as u32;
-            s.deletions += ds.deletions() as u32;
-            s.file_count += ds.files_changed() as u32;
-        }
-    };
-    if let Ok(staged) = repo.diff_tree_to_index(head_tree.as_ref(), None, None) {
-        count(staged, &mut stats);
-    }
-    if let Ok(unstaged) = repo.diff_index_to_workdir(None, None) {
-        count(unstaged, &mut stats);
+    if let Ok(ds) = combined.stats() {
+        stats.additions = ds.insertions() as u32;
+        stats.deletions = ds.deletions() as u32;
+        stats.file_count = ds.files_changed() as u32;
     }
     Ok(stats)
 }
