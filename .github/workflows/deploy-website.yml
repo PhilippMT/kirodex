@@ -36,6 +36,7 @@ jobs:
           mkdir -p _site
           cp website/index.html _site/
           cp website/changelog.html _site/
+          cp website/features.html _site/
           cp -r website/dist _site/
           cp -r website/assets _site/
 
@@ -43,6 +44,7 @@ jobs:
         run: |
           sed -i 's|<!-- base href injected by CI for GitHub Pages -->|<base href="/kirodex/">|' _site/index.html
           sed -i 's|<!-- base href injected by CI for GitHub Pages -->|<base href="/kirodex/">|' _site/changelog.html
+          sed -i 's|<!-- base href injected by CI for GitHub Pages -->|<base href="/kirodex/">|' _site/features.html
 
       - name: Use production (blue) icon
         run: cp src-tauri/icons/prod/icon.png _site/assets/icon.png
