@@ -2,7 +2,7 @@ use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize}
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::sync::Mutex;
+use parking_lot::Mutex;
 use std::thread::JoinHandle;
 use tauri::Emitter;
 
@@ -63,13 +63,22 @@ pub fn pty_create(
         .map_err(|e| AppError::Other(e.to_string()))?;
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
     let mut cmd = CommandBuilder::new(&shell);
+    // Spawn as login shell so it sources the user's profile (~/.zprofile, ~/.zshrc)
+    // which sets up PATH (Homebrew, etc.) that GUI apps don't inherit
+    cmd.arg("-l");
     cmd.cwd(&cwd);
+    // Ensure HOME and SHELL are set — macOS GUI apps sometimes lack these
+    if let Ok(home) = std::env::var("HOME") {
+        cmd.env("HOME", &home);
+    }
+    cmd.env("SHELL", &shell);
+    cmd.env("TERM", "xterm-256color");
     let child = pair.slave.spawn_command(cmd).map_err(|e| AppError::Other(e.to_string()))?;
     let mut reader = pair.master.try_clone_reader().map_err(|e| AppError::Other(e.to_string()))?;
     let writer = pair.master.take_writer().map_err(|e| AppError::Other(e.to_string()))?;
     let event_id = id.clone();
     let reader_thread = std::thread::spawn(move || {
-        let mut buf = [0u8; 4096];
+        let mut buf = [0u8; 16384];
         loop {
             match reader.read(&mut buf) {
                 Ok(0) => {
@@ -96,14 +105,14 @@ pub fn pty_create(
         child,
         _reader_thread: reader_thread,
     };
-    let mut ptys = state.0.lock().map_err(|_| AppError::LockPoisoned)?;
+    let mut ptys = state.0.lock();
     ptys.insert(id, instance);
     Ok(())
 }
 
 #[tauri::command]
 pub fn pty_write(state: tauri::State<'_, PtyState>, id: String, data: String) -> Result<(), AppError> {
-    let mut ptys = state.0.lock().map_err(|_| AppError::LockPoisoned)?;
+    let mut ptys = state.0.lock();
     let instance = ptys.get_mut(&id).ok_or_else(|| AppError::Other("PTY not found".to_string()))?;
     instance.writer.write_all(data.as_bytes()).map_err(|e| AppError::Io(e))?;
     instance.writer.flush().map_err(|e| AppError::Io(e))?;
@@ -117,7 +126,7 @@ pub fn pty_resize(
     cols: u16,
     rows: u16,
 ) -> Result<(), AppError> {
-    let ptys = state.0.lock().map_err(|_| AppError::LockPoisoned)?;
+    let ptys = state.0.lock();
     let instance = ptys.get(&id).ok_or_else(|| AppError::Other("PTY not found".to_string()))?;
     instance.master.resize(PtySize {
         rows,
@@ -130,7 +139,7 @@ pub fn pty_resize(
 
 #[tauri::command]
 pub fn pty_kill(state: tauri::State<'_, PtyState>, id: String) -> Result<(), AppError> {
-    let mut ptys = state.0.lock().map_err(|_| AppError::LockPoisoned)?;
+    let mut ptys = state.0.lock();
     ptys.remove(&id).ok_or_else(|| AppError::Other("PTY not found".to_string()))?;
     // Drop impl kills the child process and waits for it
     Ok(())

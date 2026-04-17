@@ -42,52 +42,42 @@ fn install_panic_hook() {
 }
 
 /// Gracefully shut down all ACP connections and PTY sessions.
-/// Uses lock timeouts (via try_lock) to avoid blocking the close handler
-/// if a mutex is poisoned or contested.
 fn shutdown_app(app: &tauri::AppHandle) {
     log::info!("Window close requested — shutting down");
     let start = std::time::Instant::now();
 
     // Kill all ACP connections
     if let Some(acp_state) = app.try_state::<acp::AcpState>() {
-        match acp_state.connections.lock() {
-            Ok(mut conns) => {
-                let count = conns.len();
-                for (task_id, handle) in conns.drain() {
-                    log::info!("Killing ACP connection: {}", task_id);
-                    let _ = handle.cmd_tx.send(acp::AcpCommand::Kill);
-                    // Drop the sender so the receiver side unblocks
-                    drop(handle);
-                }
-                log::info!("Sent kill to {} ACP connection(s)", count);
+        {
+            let mut conns = acp_state.connections.lock();
+            let count = conns.len();
+            for (task_id, handle) in conns.drain() {
+                log::info!("Killing ACP connection: {}", task_id);
+                let _ = handle.cmd_tx.send(acp::AcpCommand::Kill);
+                // Drop the sender so the receiver side unblocks
+                drop(handle);
             }
-            Err(e) => log::error!("Cannot lock ACP connections on close: {}", e),
+            log::info!("Sent kill to {} ACP connection(s)", count);
         }
 
         // Drop all pending permission resolvers so blocked ACP threads unblock
-        match acp_state.permission_resolvers.lock() {
-            Ok(mut resolvers) => {
-                let count = resolvers.len();
-                resolvers.clear(); // Dropping oneshot::Sender causes Err on the receiver
-                if count > 0 {
-                    log::info!("Dropped {} pending permission resolver(s)", count);
-                }
+        {
+            let mut resolvers = acp_state.permission_resolvers.lock();
+            let count = resolvers.len();
+            resolvers.clear(); // Dropping oneshot::Sender causes Err on the receiver
+            if count > 0 {
+                log::info!("Dropped {} pending permission resolver(s)", count);
             }
-            Err(e) => log::error!("Cannot lock permission resolvers on close: {}", e),
         }
     }
 
     // Kill all PTY sessions
     if let Some(pty_state) = app.try_state::<pty::PtyState>() {
-        match pty_state.0.lock() {
-            Ok(mut ptys) => {
-                let count = ptys.len();
-                ptys.clear(); // Drop impl kills child processes and waits
-                if count > 0 {
-                    log::info!("Killed {} PTY session(s)", count);
-                }
-            }
-            Err(e) => log::error!("Cannot lock PTY state on close: {}", e),
+        let mut ptys = pty_state.0.lock();
+        let count = ptys.len();
+        ptys.clear(); // Drop impl kills child processes and waits
+        if count > 0 {
+            log::info!("Killed {} PTY session(s)", count);
         }
     }
 
@@ -135,13 +125,23 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_log::Builder::new()
-            .targets([
-                tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
-                tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir { file_name: None }),
-                tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview),
-            ])
-            .build())
+        .plugin({
+            let mut log_builder = tauri_plugin_log::Builder::new()
+                .targets({
+                    let mut targets = vec![
+                        tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                        tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir { file_name: None }),
+                    ];
+                    #[cfg(debug_assertions)]
+                    targets.push(tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview));
+                    targets
+                });
+            #[cfg(debug_assertions)]
+            { log_builder = log_builder.level(log::LevelFilter::Debug); }
+            #[cfg(not(debug_assertions))]
+            { log_builder = log_builder.level(log::LevelFilter::Info); }
+            log_builder.build()
+        })
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_process::init())
@@ -207,10 +207,13 @@ pub fn run() {
             fs_ops::open_in_editor,
             fs_ops::open_url,
             fs_ops::detect_editors,
+            fs_ops::detect_editors_background,
             fs_ops::list_project_files,
             fs_ops::kiro_whoami,
             fs_ops::kiro_logout,
             fs_ops::open_terminal_with_command,
+            fs_ops::detect_project_icon,
+            fs_ops::list_small_images,
             // Git
             git::git_detect,
             git::git_list_branches,
@@ -242,6 +245,7 @@ pub fn run() {
             acp::task_fork,
             acp::task_allow_permission,
             acp::task_deny_permission,
+            acp::task_set_auto_approve,
             acp::set_mode,
             acp::list_models,
             acp::probe_capabilities,

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
+use parking_lot::Mutex;
 
 use super::error::AppError;
 
@@ -26,6 +26,8 @@ pub struct ProjectPrefs {
     pub worktree_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub symlink_directories: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tight_sandbox: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -127,7 +129,7 @@ fn persist_store(data: &StoreData) -> Result<(), AppError> {
 
 #[tauri::command]
 pub fn get_settings(state: tauri::State<'_, SettingsState>) -> Result<AppSettings, AppError> {
-    let store = state.0.lock()?;
+    let store = state.0.lock();
     Ok(store.settings.clone())
 }
 
@@ -136,7 +138,7 @@ pub fn save_settings(
     state: tauri::State<'_, SettingsState>,
     settings: AppSettings,
 ) -> Result<(), AppError> {
-    let mut store = state.0.lock()?;
+    let mut store = state.0.lock();
     store.settings = settings;
     persist_store(&store)
 }
@@ -170,6 +172,7 @@ mod tests {
                 auto_approve: Some(true),
                 worktree_enabled: Some(true),
                 symlink_directories: Some(vec!["node_modules".to_string(), ".next".to_string()]),
+                tight_sandbox: Some(true),
             },
         );
         let settings = AppSettings {
@@ -194,6 +197,14 @@ mod tests {
         assert_eq!(pp["proj"].model_id.as_deref(), Some("claude-4"));
         assert_eq!(pp["proj"].worktree_enabled, Some(true));
         assert_eq!(pp["proj"].symlink_directories.as_deref(), Some(vec!["node_modules".to_string(), ".next".to_string()]).as_deref());
+        assert_eq!(pp["proj"].tight_sandbox, Some(true));
+    }
+
+    #[test]
+    fn tight_sandbox_defaults_to_none_when_missing() {
+        let json = r#"{}"#;
+        let prefs: ProjectPrefs = serde_json::from_str(json).unwrap();
+        assert!(prefs.tight_sandbox.is_none());
     }
 
     #[test]

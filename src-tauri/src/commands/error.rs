@@ -12,8 +12,6 @@ pub enum AppError {
     Confy(#[from] confy::ConfyError),
     #[error("Task not found: {0}")]
     TaskNotFound(String),
-    #[error("Lock poisoned")]
-    LockPoisoned,
     #[error("{0}")]
     Other(String),
 }
@@ -27,12 +25,6 @@ impl Serialize for AppError {
 impl From<String> for AppError {
     fn from(s: String) -> Self {
         Self::Other(s)
-    }
-}
-
-impl<T> From<std::sync::PoisonError<T>> for AppError {
-    fn from(_: std::sync::PoisonError<T>) -> Self {
-        Self::LockPoisoned
     }
 }
 
@@ -64,12 +56,6 @@ mod tests {
     fn task_not_found_display() {
         let err = AppError::TaskNotFound("abc-123".to_string());
         assert_eq!(err.to_string(), "Task not found: abc-123");
-    }
-
-    #[test]
-    fn lock_poisoned_display() {
-        let err = AppError::LockPoisoned;
-        assert_eq!(err.to_string(), "Lock poisoned");
     }
 
     #[test]

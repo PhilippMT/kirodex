@@ -107,7 +107,7 @@ pub struct BranchResult {
 }
 
 fn resolve_workspace(state: &AcpState, task_id: &str) -> Result<String, AppError> {
-    let tasks = state.tasks.lock()?;
+    let tasks = state.tasks.lock();
     tasks
         .get(task_id)
         .map(|t| t.workspace.clone())
@@ -219,7 +219,7 @@ pub fn git_commit(
     let tree = repo.find_tree(tree_oid)?;
     let sig = repo.signature()?;
     let parent = repo.head()?.peel_to_commit()?;
-    let co_author = settings_state.0.lock().map(|s| s.settings.co_author).unwrap_or(true);
+    let co_author = settings_state.0.lock().settings.co_author;
     let message = if co_author {
         format!("{message}\n\nCo-authored-by: Kirodex <274876363+kirodex@users.noreply.github.com>")
     } else {
@@ -439,47 +439,31 @@ pub fn git_diff_file(
     let mut diff_opts = DiffOptions::new();
     diff_opts.pathspec(&file_path);
 
+    // Shared print callback for both staged and unstaged diffs
+    let mut print_line = |_delta: git2::DiffDelta, _hunk: Option<git2::DiffHunk>, line: git2::DiffLine| -> bool {
+        let origin = line.origin();
+        match origin {
+            'H' | 'F' => {
+                output.push_str(std::str::from_utf8(line.content()).unwrap_or(""));
+            }
+            '+' | '-' | ' ' => {
+                output.push(origin);
+                output.push_str(std::str::from_utf8(line.content()).unwrap_or(""));
+            }
+            _ => {
+                output.push_str(std::str::from_utf8(line.content()).unwrap_or(""));
+            }
+        }
+        true
+    };
+
     // Staged changes for this file
     let staged = repo.diff_tree_to_index(head_tree.as_ref(), None, Some(&mut diff_opts))?;
-    staged.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
-        let origin = line.origin();
-        match origin {
-            'H' | 'F' => {
-                // File header lines (diff --git, ---, +++, etc.)
-                output.push_str(std::str::from_utf8(line.content()).unwrap_or(""));
-            }
-            '+' | '-' | ' ' => {
-                output.push(origin);
-                output.push_str(std::str::from_utf8(line.content()).unwrap_or(""));
-            }
-            _ => {
-                // Hunk headers and other meta lines
-                output.push_str(std::str::from_utf8(line.content()).unwrap_or(""));
-            }
-        }
-        true
-    })?;
+    staged.print(git2::DiffFormat::Patch, &mut print_line)?;
 
-    // Unstaged changes for this file
-    let mut diff_opts2 = DiffOptions::new();
-    diff_opts2.pathspec(&file_path);
-    let unstaged = repo.diff_index_to_workdir(None, Some(&mut diff_opts2))?;
-    unstaged.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
-        let origin = line.origin();
-        match origin {
-            'H' | 'F' => {
-                output.push_str(std::str::from_utf8(line.content()).unwrap_or(""));
-            }
-            '+' | '-' | ' ' => {
-                output.push(origin);
-                output.push_str(std::str::from_utf8(line.content()).unwrap_or(""));
-            }
-            _ => {
-                output.push_str(std::str::from_utf8(line.content()).unwrap_or(""));
-            }
-        }
-        true
-    })?;
+    // Unstaged changes for this file (reuse same DiffOptions)
+    let unstaged = repo.diff_index_to_workdir(None, Some(&mut diff_opts))?;
+    unstaged.print(git2::DiffFormat::Patch, &mut print_line)?;
 
     Ok(output)
 }
@@ -552,20 +536,15 @@ pub fn git_worktree_remove(cwd: String, worktree_path: String) -> Result<(), App
 pub fn git_worktree_has_changes(worktree_path: String) -> Result<bool, AppError> {
     let repo = Repository::open(&worktree_path)?;
     let head_tree = repo.head().ok().and_then(|h| h.peel_to_tree().ok());
-    // Check staged changes
+    // Use num_deltas() instead of stats() — avoids computing line-level insertions/deletions
     if let Ok(staged) = repo.diff_tree_to_index(head_tree.as_ref(), None, None) {
-        if let Ok(stats) = staged.stats() {
-            if stats.files_changed() > 0 {
-                return Ok(true);
-            }
+        if staged.deltas().len() > 0 {
+            return Ok(true);
         }
     }
-    // Check unstaged changes
     if let Ok(unstaged) = repo.diff_index_to_workdir(None, None) {
-        if let Ok(stats) = unstaged.stats() {
-            if stats.files_changed() > 0 {
-                return Ok(true);
-            }
+        if unstaged.deltas().len() > 0 {
+            return Ok(true);
         }
     }
     Ok(false)
