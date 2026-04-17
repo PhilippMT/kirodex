@@ -1,5 +1,45 @@
 # Changelog
 
+## [v0.12.0] - 2026-04-18
+
+### Features
+
+- link commit hashes to GitHub in release notes ([`8075333`](https://github.com/thabti/kirodex/commit/807533344773aa9434e2bf80030be656fe89f4ea))
+- workspace diff support and commit input ([`abeaeb5`](https://github.com/thabti/kirodex/commit/abeaeb5d7e28299cb577b084b19b2b24a2df8fe4))
+- add commit message generation utils with tests ([`dbd3341`](https://github.com/thabti/kirodex/commit/dbd334165e2a35af9b9e3c796dd2dfa82b2b4350))
+- stage button icon swap feedback and staged count in toolbar ([`4197010`](https://github.com/thabti/kirodex/commit/4197010e9e7e77a48174bed1b897ac88d95b5fe7))
+- add 'created' sort option as default ([`b8f33a3`](https://github.com/thabti/kirodex/commit/b8f33a369c6559408d1707f50bc9fc8dc4c1bfef))
+- expand open_in_editor with terminal emulators and cross-platform support ([`852ee96`](https://github.com/thabti/kirodex/commit/852ee963a649137796ccc1083efb1e5baf1d6b5c))
+- add useProjectIcon, extend useSlashAction and useChatInput ([`348536d`](https://github.com/thabti/kirodex/commit/348536d0515013470ba0b301ec7e833f0e5e9815))
+- replace xterm.js with ghostty-web WASM terminal ([`72faa70`](https://github.com/thabti/kirodex/commit/72faa702858e24abeb61b85a206507b167b835d1))
+- add Kiro ghost logo and sponsored-by Lastline to hero ([`35b43fd`](https://github.com/thabti/kirodex/commit/35b43fddb19093897b56a8d1337fc9737949fd11))
+
+### Bug fixes
+
+- merge staged and unstaged diffs to avoid double-counting ([`1722664`](https://github.com/thabti/kirodex/commit/17226644222421ee593a9533f0e1a26f994d5610))
+
+### Refactoring
+
+- split taskStore into types, listeners, and core modules ([`4f81d87`](https://github.com/thabti/kirodex/commit/4f81d87434ff4c013484dff8f5eef6526de889b2))
+- extract DiffViewer sub-components and utilities ([`896ad0d`](https://github.com/thabti/kirodex/commit/896ad0d3364e3af5ce0a59f139b669b3762f438c))
+- extract kiro config sub-components and add project icon picker ([`57c3250`](https://github.com/thabti/kirodex/commit/57c3250d2dc3fbfe5e932fa81226bba72d508e6e))
+- extract settings sections into individual modules ([`d196e59`](https://github.com/thabti/kirodex/commit/d196e593f9e2227e707a98137781189b0dc94eec))
+- extract onboarding step components from monolithic Onboarding.tsx ([`b464d8a`](https://github.com/thabti/kirodex/commit/b464d8ac8148daf6b44ea14c896df9000d0a7f34))
+- split AppHeader into breadcrumb, toolbar, and user-menu modules ([`daec3c8`](https://github.com/thabti/kirodex/commit/daec3c894fc3fff5cfa0040d82d543116d1611ec))
+- extract chat sub-components from monolithic files ([`1dd5e51`](https://github.com/thabti/kirodex/commit/1dd5e516ac36310c354e051349910b0783a0a21f))
+- migrate std::sync::Mutex to parking_lot ([`039183c`](https://github.com/thabti/kirodex/commit/039183cecf9af8d15235a87f2dff2bf300030cb4))
+- split monolithic acp.rs into modular subfiles ([`a4973fe`](https://github.com/thabti/kirodex/commit/a4973fe929ed33a79de41726de841e555a8557c7))
+
+### Documentation
+
+- update activity log with session entries ([`216eb40`](https://github.com/thabti/kirodex/commit/216eb401c956037e6a4eef7e5abc19dca5ac7ba1))
+- add IPC reference, keyboard shortcuts, slash commands, and security audits ([`58a6fc4`](https://github.com/thabti/kirodex/commit/58a6fc4b1973e3e1e0b8dc9b8182eb25277ec2aa))
+- update main screenshot ([`823b82b`](https://github.com/thabti/kirodex/commit/823b82bf895817f28d57d2400cd6720f2b204c7d))
+
+### Chores
+
+- update activity logs, plans, website, and build config ([`c3600d6`](https://github.com/thabti/kirodex/commit/c3600d63d1a50b669f38e38116608cdd6d4fe7ae))
+
 ## [v0.11.0] - 2026-04-16
 
 ### Features
