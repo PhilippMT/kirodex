@@ -1,5 +1,47 @@
 # Activity Log
 
+## 2026-04-19 02:56 GST (Dubai)
+### Analytics: Full analytics dashboard with redb backend and recharts frontend
+Built a complete analytics dashboard accessible via `/data` or `/usage` slash commands. Tracks coding hours (session focus/blur), message counts with input/output word counts, token usage, tool calls, edited files, cumulative diff stats (+/-), model popularity, plan vs code mode usage, slash command frequency, and project stats. Backend uses redb (pure-Rust embedded KV store) for ACID-compliant persistence. Frontend uses recharts for 9 chart types (4 time-series bar charts + 5 categorical breakdowns). Events are collected in-memory and batch-flushed to Rust every 60 seconds. Settings page shows analytics file size and a clear button. All 182 Rust tests + 731 frontend tests pass.
+
+**Modified:** package.json, bun.lock, src-tauri/Cargo.toml, src-tauri/src/commands/analytics.rs, src-tauri/src/commands/mod.rs, src-tauri/src/lib.rs, src/renderer/App.tsx, src/renderer/types/analytics.ts, src/renderer/lib/analytics-collector.ts, src/renderer/lib/analytics-aggregators.ts, src/renderer/lib/ipc.ts, src/renderer/stores/analyticsStore.ts, src/renderer/stores/task-store-types.ts, src/renderer/stores/task-store-listeners.ts, src/renderer/hooks/useSlashAction.ts, src/renderer/hooks/useSlashAction.test.ts, src/renderer/hooks/useSessionTracker.ts, src/renderer/components/chat/ChatPanel.tsx, src/renderer/components/chat/SlashPanels.tsx, src/renderer/components/settings/advanced-section.tsx, src/renderer/components/analytics/AnalyticsDashboard.tsx, src/renderer/components/analytics/ChartCard.tsx, src/renderer/components/analytics/CodingHoursChart.tsx, src/renderer/components/analytics/MessagesChart.tsx, src/renderer/components/analytics/TokensChart.tsx, src/renderer/components/analytics/DiffStatsChart.tsx, src/renderer/components/analytics/HorizontalBarSection.tsx, src/renderer/components/analytics/ModelPopularityChart.tsx, src/renderer/components/analytics/ModeUsageChart.tsx, src/renderer/components/analytics/SlashCommandChart.tsx, src/renderer/components/analytics/ToolCallChart.tsx, src/renderer/components/analytics/ProjectStatsChart.tsx
+
+## 2026-04-19 02:45 GST (Dubai)
+### Chat: Remove show more/show less collapsible content
+Removed the `CollapsibleContent` component that truncated long messages at 600px and showed a "Show more" / "Show less" toggle. It was causing scrolling issues. Unwrapped the content in `AssistantTextRow` and `UserMessageRow` so messages render at full height. Deleted `CollapsibleContent.tsx`.
+
+**Modified:** `src/renderer/components/chat/AssistantTextRow.tsx`, `src/renderer/components/chat/UserMessageRow.tsx`, `src/renderer/components/chat/CollapsibleContent.tsx` (deleted)
+
+## 2026-04-19 02:28 GST (Dubai)
+### SubagentDisplay: Show per-agent task descriptions and improve expanded layout
+Each stage card now displays the agent's task description extracted from `prompt_template` (first meaningful line, truncated at 200 chars). Stages render in individual `bg-muted/30` cards with the robot icon. Overall task description shows below the header when it differs from the summary. Dependency indicator changed from clock icon to arrow icon with "depends on" label.
+
+**Modified:** src/renderer/components/chat/SubagentDisplay.tsx
+
+## 2026-04-19 02:27 GST (Dubai)
+### SubagentDisplay: Replace users icon with robot, improve agent count badge
+Swapped `IconUsers` for `IconRobot` with `aria-hidden` in the subagent header button. Added a violet pill badge around the agent count number for better visual clarity.
+
+**Modified:** src/renderer/components/chat/SubagentDisplay.tsx
+
+## 2026-04-19 01:55 GST (Dubai)
+### Auth: Fix login screen stuck due to checkAuth race condition
+`checkAuth()` ran before `loadSettings()` completed, so it used the default `kiro-cli` binary name. Inside a Tauri .app on macOS, `/opt/homebrew/bin` isn't in PATH, so the command failed silently and `kiroAuth` stayed null, trapping users on the sign-in screen. Two fixes: (1) Rust `kiro_whoami` now falls back to `detect_kiro_cli()` if the provided binary fails, (2) frontend chains `checkAuth` after `loadSettings` resolves.
+
+**Modified:** `src-tauri/src/commands/fs_ops.rs`, `src/renderer/App.tsx`
+
+## 2026-04-19 01:53 GST (Dubai)
+### Window: Add quit confirmation dialog on Cmd+Q / window close
+Intercept `CloseRequested` with `api.prevent_close()` and show a native confirmation dialog ("Quit" / "Cancel") before shutting down. Only calls `shutdown_app` and `app.exit(0)` if the user confirms. Uses `tauri_plugin_dialog` which was already registered.
+
+**Modified:** `src-tauri/src/lib.rs`
+
+## 2026-04-19 00:28 GST (Dubai)
+### Persistence: Thread & state persistence across version updates
+Fixed threads being lost during version updates. Root cause: `relaunch()` killed the process before `LazyStore`'s 500ms autoSave debounce flushed pending writes. Added `flush()` + `createBackup()` before every relaunch path, `beforeunload` safety net, and automatic backup restoration on startup. Also fixed `iconOverride` being silently dropped by the Rust `ProjectPrefs` struct (missing field). Added throttled periodic backups every 5 minutes.
+
+**Modified:** `src-tauri/src/commands/settings.rs`, `src/renderer/lib/history-store.ts`, `src/renderer/lib/history-store.test.ts`, `src/renderer/lib/relaunch.ts`, `src/renderer/hooks/useUpdateChecker.ts`, `src/renderer/components/settings/updates-card.tsx`, `src/renderer/components/settings/AboutDialog.tsx`, `src/renderer/main.tsx`, `src/renderer/stores/taskStore.ts`, `src/renderer/stores/taskStore.test.ts`, `src/renderer/stores/settingsStore.ts`, `src/renderer/stores/settingsStore.test.ts`, `src/renderer/stores/task-store-listeners.ts`
+
 ## 2026-04-18 17:48 GST (Dubai)
 ### BranchSelector: Add local branch delete button
 Added a trash icon button to each local branch row in the branch selector popup. The button appears on hover and deletes the branch locally via a new `git_delete_branch` Rust command using git2. Cannot delete the current branch or worktree-locked branches.

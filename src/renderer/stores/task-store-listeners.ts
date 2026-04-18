@@ -8,6 +8,28 @@ import { useKiroStore } from '@/stores/kiroStore'
 import { useDiffStore } from '@/stores/diffStore'
 import { useTaskStore } from './taskStore'
 import type { TaskStore } from './task-store-types'
+import { record } from '@/lib/analytics-collector'
+
+/** Get the project basename from a workspace path (privacy: no full paths). */
+const projectName = (workspace: string): string => {
+  const parts = workspace.replace(/\\/g, '/').split('/')
+  return parts[parts.length - 1] || workspace
+}
+
+// ── Throttled periodic backup ────────────────────────────────────
+
+const BACKUP_THROTTLE_MS = 5 * 60 * 1000 // 5 minutes
+let lastBackupTime = 0
+
+/** Best-effort backup, throttled to once per 5 minutes */
+const throttledBackup = (): void => {
+  const now = Date.now()
+  if (now - lastBackupTime < BACKUP_THROTTLE_MS) return
+  lastBackupTime = now
+  import('@/lib/history-store').then((hs) =>
+    hs.createBackup(useSettingsStore.getState().settings),
+  ).catch(() => {})
+}
 
 /** Pure state reducer for turn_end — exported for testing. */
 export const applyTurnEnd = (
@@ -130,6 +152,17 @@ export function initTaskListeners(): () => void {
     ) {
       useDiffStore.getState().fetchDiff(taskId)
     }
+    // Analytics: record completed tool calls
+    if (toolCall.status === 'completed') {
+      const task = useTaskStore.getState().tasks[taskId]
+      const proj = task ? projectName(task.originalWorkspace ?? task.workspace) : undefined
+      record('tool_call', { project: proj, thread: taskId, detail: toolCall.kind ?? 'other' })
+      if (toolCall.kind === 'edit' || toolCall.kind === 'delete' || toolCall.kind === 'move') {
+        const filePath = toolCall.locations?.[0]?.path
+        const fileName = filePath ? filePath.split('/').pop() ?? filePath : undefined
+        record('file_edited', { project: proj, thread: taskId, detail: fileName })
+      }
+    }
   })
 
   const unsub6 = ipc.onPlanUpdate(({ taskId, plan }) => {
@@ -138,6 +171,13 @@ export function initTaskListeners(): () => void {
 
   const unsub7 = ipc.onUsageUpdate(({ taskId, used, size }) => {
     useTaskStore.getState().updateUsage(taskId, used, size)
+    const task = useTaskStore.getState().tasks[taskId]
+    record('token_usage', {
+      project: task ? projectName(task.originalWorkspace ?? task.workspace) : undefined,
+      thread: taskId,
+      value: used,
+      value2: size,
+    })
   })
 
   // Track refusal retries per task — allows one automatic retry before giving up
@@ -161,6 +201,7 @@ export function initTaskListeners(): () => void {
       // Apply turn end with retry flag so the system message is appropriate
       useTaskStore.setState((s) => applyTurnEnd(s, taskId, stopReason, !alreadyRetried))
       useTaskStore.getState().persistHistory()
+      throttledBackup()
 
       if (!alreadyRetried) {
         // First refusal: mark as retried and auto-retry the last user message
@@ -206,8 +247,33 @@ export function initTaskListeners(): () => void {
     // Use a single setState to avoid stale reads between getState() calls
     useTaskStore.setState((s) => applyTurnEnd(s, taskId, stopReason))
 
+    // Analytics: record assistant output word count and diff stats
+    {
+      const t = useTaskStore.getState().tasks[taskId]
+      if (t) {
+        const proj = projectName(t.originalWorkspace ?? t.workspace)
+        const lastMsg = t.messages[t.messages.length - 1]
+        if (lastMsg?.role === 'assistant' && lastMsg.content) {
+          record('message_received', {
+            project: proj,
+            thread: taskId,
+            value: lastMsg.content.split(/\s+/).filter(Boolean).length,
+          })
+        }
+        const ws = t.worktreePath ?? t.workspace
+        ipc.gitDiffStats(ws).then((stats) => {
+          if (stats.additions > 0 || stats.deletions > 0) {
+            record('diff_stats', { project: proj, thread: taskId, value: stats.additions, value2: stats.deletions })
+          }
+        }).catch(() => {})
+        const model = useSettingsStore.getState().currentModelId
+        if (model) record('model_used', { project: proj, thread: taskId, detail: model })
+      }
+    }
+
     // Persist history after turn ends
     useTaskStore.getState().persistHistory()
+    throttledBackup()
 
     // Send a native notification when the window is not focused and notifications are enabled
     const settings = useSettingsStore.getState().settings

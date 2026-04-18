@@ -24,6 +24,11 @@ const DebugPanel = lazy(() =>
     default: m.DebugPanel,
   })),
 );
+const AnalyticsDashboard = lazy(() =>
+  import("@/components/analytics/AnalyticsDashboard").then((m) => ({
+    default: m.AnalyticsDashboard,
+  })),
+);
 import { useTaskStore, initTaskListeners } from "@/stores/taskStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useDebugStore } from "@/stores/debugStore";
@@ -31,6 +36,8 @@ import { useDiffStore } from "@/stores/diffStore";
 import { useKiroStore, initKiroListeners } from "@/stores/kiroStore";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useUpdateChecker } from "@/hooks/useUpdateChecker";
+import { useSessionTracker } from "@/hooks/useSessionTracker";
+import { startAutoFlush, stopAutoFlush } from "@/lib/analytics-collector";
 import { RestartPromptDialog } from "@/components/sidebar/RestartPromptDialog";
 import { WorktreeCleanupDialog } from "@/components/sidebar/WorktreeCleanupDialog";
 import { getVersion } from "@tauri-apps/api/app";
@@ -215,6 +222,7 @@ export function App() {
   const sidebarPosition = useSettingsStore((s) => s.settings.sidebarPosition ?? 'left');
   const isRightSidebar = sidebarPosition === 'right';
   useKeyboardShortcuts();
+  useSessionTracker();
 
   // Apply font size from settings to the document root
   useEffect(() => {
@@ -258,8 +266,9 @@ export function App() {
     useTaskStore.getState().loadTasks().then(() => {
       useTaskStore.getState().purgeExpiredSoftDeletes();
     });
-    useSettingsStore.getState().loadSettings();
-    useSettingsStore.getState().checkAuth();
+    useSettingsStore.getState().loadSettings().then(() => {
+      useSettingsStore.getState().checkAuth();
+    });
     // Pre-warm ACP to get models/modes before user creates a thread
     ipc.probeCapabilities().catch(() => {});
     // Purge expired soft-deleted threads every hour
@@ -285,9 +294,11 @@ export function App() {
     window.addEventListener("focus", handleWindowFocus);
     const cleanupTask = initTaskListeners();
     const cleanupKiro = initKiroListeners();
+    startAutoFlush();
     return () => {
       window.removeEventListener("focus", handleWindowFocus);
       clearInterval(purgeInterval);
+      stopAutoFlush();
       cleanupTask();
       cleanupKiro();
     };
@@ -375,7 +386,9 @@ export function App() {
             <ErrorBoundary>
               <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl" style={{ fontSize: 'var(--app-font-size, 14px)' }}>
                 <Suspense>
-                  {selectedTaskId ? (
+                  {view === 'analytics' ? (
+                    <AnalyticsDashboard />
+                  ) : selectedTaskId ? (
                     <ChatPanel />
                   ) : pendingWorkspace ? (
                     <PendingChat key={pendingWorkspace} workspace={pendingWorkspace} />

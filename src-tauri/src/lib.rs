@@ -6,7 +6,7 @@ extern crate objc;
 
 mod commands;
 
-use commands::{acp, fs_ops, git, kiro_config, pty, settings};
+use commands::{acp, analytics, fs_ops, git, kiro_config, pty, settings};
 use tauri::Manager;
 
 /// Install a global panic hook that logs the panic message and backtrace.
@@ -146,6 +146,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_process::init())
         .manage(settings::SettingsState::default())
+        .manage(analytics::AnalyticsState::default())
         .manage(acp::AcpState::default())
         .manage(pty::PtyState::default())
         .setup(|app| {
@@ -179,8 +180,20 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             match event {
-                tauri::WindowEvent::CloseRequested { .. } => {
-                    shutdown_app(window.app_handle());
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    api.prevent_close();
+                    let app = window.app_handle().clone();
+                    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+                    app.dialog()
+                        .message("Are you sure you want to quit Kirodex?")
+                        .title("Quit Kirodex")
+                        .buttons(MessageDialogButtons::OkCancelCustom("Quit".to_string(), "Cancel".to_string()))
+                        .show(move |confirmed| {
+                            if confirmed {
+                                shutdown_app(&app);
+                                app.exit(0);
+                            }
+                        });
                 }
                 #[cfg(target_os = "macos")]
                 tauri::WindowEvent::Focused(_) => {
@@ -258,6 +271,11 @@ pub fn run() {
             pty::pty_kill,
             // Kiro config
             kiro_config::get_kiro_config,
+            // Analytics
+            analytics::analytics_save,
+            analytics::analytics_load,
+            analytics::analytics_clear,
+            analytics::analytics_db_size,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {
