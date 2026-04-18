@@ -1,5 +1,47 @@
 # Changelog
 
+## [v0.13.0] - 2026-04-18
+
+### Features
+
+- add local branch delete to branch selector ([`2ea4ced`](https://github.com/thabti/kirodex/commit/2ea4ced34c6656fb10e4ad5219fc5b38114e93d5))
+- add emoji icon picker and improve btw overlay ([`d094b49`](https://github.com/thabti/kirodex/commit/d094b494e6894263d00f6808f1a1fa4da2779221))
+- render strReplace tool calls as git-style diffs ([`ff4daca`](https://github.com/thabti/kirodex/commit/ff4dacaa6fe8a036e36afd2301205528d864482d))
+- add tooltip to worktree icons in sidebar and header ([`3cbe1ed`](https://github.com/thabti/kirodex/commit/3cbe1ed4c22e2f89073f0d389e3fe14708732c4f))
+
+### Bug fixes
+
+- raise paste placeholder threshold to 100 words / 10 lines ([`efcea1c`](https://github.com/thabti/kirodex/commit/efcea1c02138e32ab086aeab14bdaa0f7643413e))
+- improve Show more button visibility and increase collapse threshold ([`cdec0c2`](https://github.com/thabti/kirodex/commit/cdec0c26c58d9c4ccb3f3bc14750f8eeb21db164))
+- add missing /fork command and fix restoreTask assertion ([`869aeea`](https://github.com/thabti/kirodex/commit/869aeea99055870438cdb5c9b9ef642a93a42b39))
+- send images as proper ContentBlock::Image (#14) ([`0a2a5f9`](https://github.com/thabti/kirodex/commit/0a2a5f92e21a05783205c3bef5927cb60c48a6ab))
+- ignore Escape key when terminal is focused ([`8934ec3`](https://github.com/thabti/kirodex/commit/8934ec32ad9e8b4e22f9f231b8c5e0d1b7a74e3a))
+- show all project image files in file tab ([`4d437c8`](https://github.com/thabti/kirodex/commit/4d437c8cb3fad90915ffd40298cb715df1739863))
+- include features.html in website deployment ([`de58e75`](https://github.com/thabti/kirodex/commit/de58e752ae9ffc357ee8eccf8991102fd722d246))
+- render markdown links in changelog page ([`944ced6`](https://github.com/thabti/kirodex/commit/944ced6ce88e88b673723ff9c398ea95ae20e388))
+- type ipcMock.setAutoApprove with explicit signature ([`98927c8`](https://github.com/thabti/kirodex/commit/98927c83946c595045f132b56859a5cd76aa259f))
+
+### Styling
+
+- improve delete button hover UX ([`f363a0d`](https://github.com/thabti/kirodex/commit/f363a0da6b3873d2c0ceb83ac42dbe2653c54d5c))
+
+### CI
+
+- flatten artifact paths to just .dmg and .exe ([`57f9337`](https://github.com/thabti/kirodex/commit/57f9337b2715f5d243b5fc9bc0d15a145286d172))
+- add label-triggered PR build workflow (#16) ([`6d0faac`](https://github.com/thabti/kirodex/commit/6d0faac6d6b2b5f88c4e569d8ce474647b5b7c8a))
+- add label-triggered PR build workflow for DMG and EXE ([`54e71a1`](https://github.com/thabti/kirodex/commit/54e71a191e9fa568ca2c671848cc48722c4a4010))
+
+### Chores
+
+- update downloads.json ([`5b05992`](https://github.com/thabti/kirodex/commit/5b05992ddc65f24b281d69c28535e43ac6f736b0))
+- update downloads.json ([`72f21a4`](https://github.com/thabti/kirodex/commit/72f21a49ca68f77e23c2d2e38a78ee4539fc669e))
+
+### Other changes
+
+- merge: integrate remote changes with local CI workflow ([`4f94292`](https://github.com/thabti/kirodex/commit/4f9429247cc88d294068d38a9ab39e06ad16b14a))
+- activity update ([`8a12288`](https://github.com/thabti/kirodex/commit/8a122885b0ef7becd6388ba63eb00494c1191670))
+- erge branch 'main' of github.com:thabti/kirodex ([`78f9e81`](https://github.com/thabti/kirodex/commit/78f9e816cb54945a56ea50361f2afc7b08e818b9))
+
 ## [v0.12.0] - 2026-04-18
 
 ### Features
