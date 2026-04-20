@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.16.1] - 2026-04-21
+
+### Bug fixes
+
+- bypass quit confirmation dialog on relaunch ([`8ee1659`](https://github.com/thabti/kirodex/commit/8ee1659ea27d81b73c7706f730bbac4a635bfa2e))
+
 ## [v0.16.0] - 2026-04-21
 
 ### Features
