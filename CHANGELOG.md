@@ -1,5 +1,18 @@
 # Changelog
 
+## [v0.17.0] - 2026-04-21
+
+### Features
+
+- recent projects menu and UI state persistence across restarts ([`e91f0c6`](https://github.com/thabti/kirodex/commit/e91f0c6ce3a96f5f3215699b373c562b2c4f694e))
+- add Copy Path to project context menu ([`c92ca7f`](https://github.com/thabti/kirodex/commit/c92ca7ffc42f7323568fc3816c7b57b13dbc3460))
+
+### Bug fixes
+
+- use separate store file for dev builds ([`240b96e`](https://github.com/thabti/kirodex/commit/240b96edd53ee0bd1c050213828525f9dd50abed))
+- render completion card for all valid reports, not just file changes ([`c2430dd`](https://github.com/thabti/kirodex/commit/c2430dd5fdc00cd70364f886d294075a3e239bcc))
+- set working directory when spawning kiro-cli subprocess ([`bb63034`](https://github.com/thabti/kirodex/commit/bb630348967dadb8a0a0ca335e9220e33ed8401d))
+
 ## [v0.16.1] - 2026-04-21
 
 ### Bug fixes
