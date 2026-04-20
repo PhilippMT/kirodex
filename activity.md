@@ -1,5 +1,11 @@
 # Activity Log
 
+## 2026-04-21 02:07 GST (Dubai)
+### History Store: Separate dev and prod store files
+Dev builds now use `history-dev.json` and `history-dev.backup.json` via `import.meta.env.DEV`, so running `bun run dev` no longer shares or overwrites the production app's history data.
+
+**Modified:** `src/renderer/lib/history-store.ts`
+
 ## 2026-04-21 02:00 GST (Dubai)
 ### ACP: Fix kiro-cli spawning in src-tauri instead of the selected project directory
 Added `.current_dir(&workspace)` to the kiro-cli process spawn in `connection.rs` so the agent runs in the user's project directory, not the Tauri dev directory. Also fixed the `list_models` probe to use `$HOME` instead of `std::env::current_dir()` for consistency with `probe_capabilities`.
