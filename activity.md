@@ -1,5 +1,10 @@
 # Activity Log
 
+## 2026-04-20 23:39 GST (Dubai)
+### Chat: Open links in OS default browser
+Clicking links in chat messages, settings, about dialog, onboarding, and kiro file viewer now opens them in the OS default browser via Tauri's `open_url` command instead of failing silently with `target="_blank"`. Created a shared `open-external.ts` helper and applied it to all anchor elements across the app.
+
+**Modified:** `src/renderer/lib/open-external.ts` (new), `src/renderer/components/chat/ChatMarkdown.tsx`, `src/renderer/components/settings/SettingsPanel.tsx`, `src/renderer/components/settings/AboutDialog.tsx`, `src/renderer/components/OnboardingCliSection.tsx`, `src/renderer/components/sidebar/KiroFileViewer.tsx`
 
 ## 2026-04-20 14:20 GST (Dubai)
 ### TaskStore: Restore soft-deleted threads when re-importing the same project
