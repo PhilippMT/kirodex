@@ -152,6 +152,9 @@ export const ipc = {
     invoke('kiro_logout', { kiroBin }),
   openTerminalWithCommand: (command: string): Promise<void> =>
     invoke('open_terminal_with_command', { command }),
+  // Relaunch
+  setRelaunchFlag: (): Promise<void> =>
+    invoke('set_relaunch_flag'),
   // Analytics
   analyticsSave: (events: import('@/types/analytics').AnalyticsEvent[]): Promise<void> =>
     invoke('analytics_save', { events }),

@@ -1,5 +1,13 @@
 # Activity Log
 
+## 2026-04-21 01:22 GST (Dubai)
+### Updater: Fix "Restart now" button blocked by quit confirmation dialog
+The "Restart now" button in the update-ready dialog (and the restart buttons in Settings and About) did nothing because `relaunch()` triggers a `CloseRequested` window event, which was unconditionally calling `api.prevent_close()` and showing a quit confirmation dialog. Added a `RelaunchFlag` (`AtomicBool`) to Rust managed state with a `set_relaunch_flag` Tauri command. `prepareForRelaunch()` now sets this flag before calling `relaunch()`. The `CloseRequested` handler checks the flag and skips the confirmation dialog when a relaunch is in progress, calling `shutdown_app()` for cleanup instead.
+
+**Modified:**
+- `src-tauri/src/lib.rs` — Added `RelaunchFlag` struct, `set_relaunch_flag` command, updated `CloseRequested` handler
+- `src/renderer/lib/ipc.ts` — Added `setRelaunchFlag` IPC wrapper
+- `src/renderer/lib/relaunch.ts` — Call `ipc.setRelaunchFlag()` in `prepareForRelaunch()`
 ## 2026-04-21 01:16 GST (Dubai)
 ### Git: Switch network ops (fetch/push/pull) to git CLI
 Replaced `git2` `RemoteCallbacks` + `Cred` credential handling with plain `git` CLI calls for fetch, push, and pull. `git2`/libssh2 can't access macOS Keychain passphrases for encrypted SSH keys, causing auth failures even when `ssh` works fine. The CLI inherits the user's full SSH agent, credential helpers, and Keychain integration. Local operations (diff, stage, branch, commit) still use `git2`. Removed `Cred`, `RemoteCallbacks` imports and the `make_remote_callbacks` function.
