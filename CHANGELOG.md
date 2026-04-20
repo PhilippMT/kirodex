@@ -1,5 +1,27 @@
 # Changelog
 
+## [v0.15.0] - 2026-04-21
+
+### Features
+
+- open external links in OS default browser ([`e5fc335`](https://github.com/thabti/kirodex/commit/e5fc335a35ab6bb8fc7ebcebef7c4b0fd5c53fc9))
+- add active project focus indicator ([`9e1c055`](https://github.com/thabti/kirodex/commit/9e1c05510c277e9ec9f5ec85e9376d3ada105f95))
+
+### Bug fixes
+
+- resolve whitespace gaps, scroll jank, and steering duplication ([`7b10772`](https://github.com/thabti/kirodex/commit/7b10772e7b32491653debe7c1951881f231ec29d))
+- restore soft-deleted threads when re-importing project (#18) ([`7f7350b`](https://github.com/thabti/kirodex/commit/7f7350be1c44da48973c49606abc29fa9f1bb0b4)) — thanks @kvginnovate
+
+### Chores
+
+- update downloads.json ([`904b2d9`](https://github.com/thabti/kirodex/commit/904b2d96fd1318232253a975459d3c34d7eacfa5))
+- update downloads.json ([`de2b581`](https://github.com/thabti/kirodex/commit/de2b58162d84f56aaaaa4ba6420882a9566e9585))
+- update downloads.json ([`df89a19`](https://github.com/thabti/kirodex/commit/df89a19bfaae616db91bad20c6143ecb27e79651))
+
+### Other changes
+
+- Merge branch 'main' of github.com:thabti/kirodex ([`03608bc`](https://github.com/thabti/kirodex/commit/03608bc0bfea3b045a925e4aec21cb02380feb84))
+
 ## [v0.14.0] - 2026-04-19
 
 ### Features
