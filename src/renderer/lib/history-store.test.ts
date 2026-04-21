@@ -299,6 +299,27 @@ describe('projectId persistence', () => {
     expect(projects[0].threadIds).toContain('t2')
   })
 
+  it('persists knownProjects even when they have no tasks', async () => {
+    await saveThreads({}, {}, {}, ['/ws1', '/ws2'])
+    const projects = mockSet.mock.calls.find((c: unknown[]) => c[0] === 'projects')?.[1]
+    expect(projects).toHaveLength(2)
+    expect(projects.map((p: { workspace: string }) => p.workspace)).toEqual(['/ws1', '/ws2'])
+  })
+
+  it('merges knownProjects with task-derived projects', async () => {
+    const tasks: Record<string, AgentTask> = {
+      't1': {
+        id: 't1', name: 'Task', workspace: '/ws1', status: 'paused',
+        createdAt: '', messages: [{ role: 'user', content: 'hi', timestamp: '' }],
+      },
+    }
+    await saveThreads(tasks, {}, {}, ['/ws1', '/ws2'])
+    const projects = mockSet.mock.calls.find((c: unknown[]) => c[0] === 'projects')?.[1]
+    expect(projects).toHaveLength(2)
+    expect(projects.find((p: { workspace: string }) => p.workspace === '/ws1').threadIds).toContain('t1')
+    expect(projects.find((p: { workspace: string }) => p.workspace === '/ws2').threadIds).toEqual([])
+  })
+
   it('toArchivedTasks restores projectId', () => {
     const saved = [{
       id: 't1', name: 'WT Thread', workspace: '/ws/.kiro/worktrees/feat',

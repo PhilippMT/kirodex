@@ -41,6 +41,7 @@ import { startAutoFlush, stopAutoFlush } from "@/lib/analytics-collector";
 import * as historyStore from "@/lib/history-store";
 import { RestartPromptDialog } from "@/components/sidebar/RestartPromptDialog";
 import { WorktreeCleanupDialog } from "@/components/sidebar/WorktreeCleanupDialog";
+import { InstallCliDialog } from "@/components/settings/install-cli-dialog";
 import { getVersion } from "@tauri-apps/api/app";
 import {
   initAnalytics,
@@ -256,6 +257,7 @@ export function App() {
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(240);
+  const [installCliOpen, setInstallCliOpen] = useState(false);
 
   // Refs to expose current values to the flush-before-quit event listener
   const sidePanelOpenRef = useRef(sidePanelOpen);
@@ -300,7 +302,7 @@ export function App() {
     }, 60 * 60 * 1000);
     // Auto-save thread history every 30s as a safety net
     const autoSaveInterval = setInterval(() => {
-      useTaskStore.getState().persistHistory()
+      void useTaskStore.getState().persistHistory().catch(() => {})
     }, 30_000);
     // Request notification permission so end_turn alerts work
     import("@tauri-apps/plugin-notification").then(({ isPermissionGranted, requestPermission, onAction }) => {
@@ -327,17 +329,19 @@ export function App() {
     let unlistenNewProject: (() => void) | null = null
     let unlistenRecentProject: (() => void) | null = null
     let unlistenFlushBeforeQuit: (() => void) | null = null
+    let unlistenInstallCli: (() => void) | null = null
     import('@tauri-apps/api/event').then(({ listen }) => {
       // Rust emits this right before shutdown — flush all state to disk,
       // then signal back so Rust can proceed with exit.
       listen('app://flush-before-quit', async () => {
         try {
-          const { tasks, projectNames, projectIds, softDeleted, selectedTaskId, view } = useTaskStore.getState()
+          const { tasks, projects, projectNames, projectIds, softDeleted, selectedTaskId, view } = useTaskStore.getState()
           await historyStore.persistAndFlush(
             tasks,
             projectNames,
             projectIds,
             Object.values(softDeleted),
+            projects,
           )
           await historyStore.saveUiState({
             selectedTaskId,
@@ -374,6 +378,9 @@ export function App() {
         state.addProject(path)
         state.setPendingWorkspace(path)
       }).then((fn) => { unlistenRecentProject = fn })
+      listen('menu-install-cli', () => {
+        setInstallCliOpen(true)
+      }).then((fn) => { unlistenInstallCli = fn })
     })
     // Cross-window state sync — reload when another window persists changes
     let unsubSync: (() => void) | null = null
@@ -381,12 +388,14 @@ export function App() {
     import('@/lib/history-store').then(({ subscribeToChanges }) => {
       subscribeToChanges(
         () => {
+          console.log('[App] cross-window sync: threads changed, reloading tasks')
           if (syncDebounce) clearTimeout(syncDebounce)
           syncDebounce = setTimeout(() => {
             useTaskStore.getState().loadTasks()
           }, 300)
         },
         () => {
+          console.log('[App] cross-window sync: projects changed, reloading tasks')
           if (syncDebounce) clearTimeout(syncDebounce)
           syncDebounce = setTimeout(() => {
             useTaskStore.getState().loadTasks()
@@ -405,6 +414,7 @@ export function App() {
       if (unlistenNewProject) unlistenNewProject()
       if (unlistenRecentProject) unlistenRecentProject()
       if (unlistenFlushBeforeQuit) unlistenFlushBeforeQuit()
+      if (unlistenInstallCli) unlistenInstallCli()
       if (unsubSync) unsubSync()
       if (syncDebounce) clearTimeout(syncDebounce)
     };
@@ -539,6 +549,7 @@ export function App() {
       <UpdateNotifier />
       <RestartPromptDialog />
       <WorktreeCleanupDialog />
+      <InstallCliDialog open={installCliOpen} onOpenChange={setInstallCliOpen} />
     </TooltipProvider>
   );
 }

@@ -60,8 +60,9 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   setNewProjectOpen: (open) => set({ isNewProjectOpen: open }),
   setSettingsOpen: (open, section) => set({ isSettingsOpen: open, settingsInitialSection: section ?? null }),
   addProject: (workspace) => {
-    if (get().projects.includes(workspace)) return
-    if (workspace.includes('/.kiro/worktrees/')) return
+    console.log('[taskStore] addProject:', workspace)
+    if (get().projects.includes(workspace)) { console.log('[taskStore] addProject: already exists, skipping'); return }
+    if (workspace.includes('/.kiro/worktrees/')) { console.log('[taskStore] addProject: worktree path, skipping'); return }
     const id = crypto.randomUUID()
     set((s) => {
       // Restore soft-deleted threads that belonged to this workspace
@@ -69,6 +70,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         const t = s.softDeleted[tid].task
         return (t.originalWorkspace ?? t.workspace) === workspace
       })
+      console.log('[taskStore] addProject: restoring', restoredIds.length, 'soft-deleted threads')
       const tasks = { ...s.tasks }
       const softDeleted = { ...s.softDeleted }
       const deletedTaskIds = new Set(s.deletedTaskIds)
@@ -77,6 +79,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         delete softDeleted[tid]
         deletedTaskIds.delete(tid)
       }
+      console.log('[taskStore] addProject: state after set — projects:', s.projects.length + 1, 'tasks:', Object.keys(tasks).length)
       return {
         projects: [...s.projects, workspace],
         projectIds: { ...s.projectIds, [workspace]: id },
@@ -86,7 +89,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       }
     })
     if (Object.keys(get().softDeleted).length > 0 || Object.keys(get().tasks).length > 0) {
-      get().persistHistory()
+      void get().persistHistory().catch((err) => console.error('[taskStore] addProject persistHistory failed:', err))
     }
   },
   getProjectId: (workspace) => {
@@ -269,7 +272,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       liveToolCalls: { ...s.liveToolCalls, [id]: [] },
     }))
     void ipc.deleteTask(id)
-    get().persistHistory()
+    void get().persistHistory().catch(() => {})
   },
 
   softDeleteTask: (id) => {
@@ -316,7 +319,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         selectedTaskId: state.selectedTaskId === id ? null : state.selectedTaskId,
       }
     })
-    get().persistHistory()
+    void get().persistHistory().catch(() => {})
   },
 
   restoreTask: (id) => {
@@ -337,7 +340,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         projects,
       }
     })
-    get().persistHistory()
+    void get().persistHistory().catch(() => {})
   },
 
   permanentlyDeleteTask: (id) => {
@@ -348,7 +351,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       deletedTaskIds.add(id)
       return { softDeleted: remaining, deletedTaskIds }
     })
-    get().persistHistory()
+    void get().persistHistory().catch(() => {})
   },
 
   purgeExpiredSoftDeletes: () => {
@@ -368,7 +371,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       }
       return { softDeleted: next, deletedTaskIds }
     })
-    get().persistHistory()
+    void get().persistHistory().catch(() => {})
   },
 
   appendChunk: (taskId, chunk) =>
@@ -543,6 +546,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   setPendingWorkspace: (workspace) => {
+    console.log('[taskStore] setPendingWorkspace:', workspace)
     set({
       pendingWorkspace: workspace,
       selectedTaskId: null,
@@ -562,7 +566,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       if (!task || task.name === name) return state
       return { tasks: { ...state.tasks, [taskId]: { ...task, name } } }
     })
-    get().persistHistory()
+    void get().persistHistory().catch(() => {})
   },
 
   forkTask: async (taskId) => {
@@ -589,7 +593,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
           isForking: false,
         }
       })
-      get().persistHistory()
+      void get().persistHistory().catch(() => {})
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       const { selectedTaskId, tasks, upsertTask } = get()
@@ -707,8 +711,10 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   loadTasks: async () => {
+    console.log('[taskStore] loadTasks: starting')
     try {
       const list = await ipc.listTasks()
+      console.log('[taskStore] loadTasks: listTasks returned', list.length, 'live tasks')
       const tasks: Record<string, AgentTask> = Object.fromEntries(list.map((t) => [t.id, t]))
 
       // Load persisted history (archived threads from previous sessions)
@@ -718,6 +724,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
           historyStore.loadProjects(),
           historyStore.loadSoftDeleted(),
         ])
+        console.log('[taskStore] loadTasks: history loaded —', savedThreads.length, 'threads,', savedProjects.length, 'projects,', savedSoftDeleted.length, 'softDeleted')
         const archived = historyStore.toArchivedTasks(savedThreads)
         for (const t of archived) {
           if (!tasks[t.id]) {
@@ -749,6 +756,11 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         for (const ws of projects) {
           if (!projectIds[ws]) projectIds[ws] = crypto.randomUUID()
         }
+        // Reconcile task projectId to match current projectIds map
+        for (const t of Object.values(tasks)) {
+          const ws = t.originalWorkspace ?? t.workspace
+          if (projectIds[ws]) t.projectId = projectIds[ws]
+        }
         // Restore soft-deleted threads and rebuild deletedTaskIds guard
         const softDeleted: Record<string, import('@/types').SoftDeletedThread> = {}
         const deletedTaskIds = new Set<string>()
@@ -779,8 +791,10 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
             }
           }
         } catch { /* backup load is best-effort */ }
+        console.log('[taskStore] loadTasks: final state —', Object.keys(tasks).length, 'tasks,', projects.length, 'projects')
         set({ tasks, projects, projectIds, projectNames, softDeleted, deletedTaskIds, connected: true })
-      } catch {
+      } catch (err) {
+        console.warn('[taskStore] loadTasks: history load failed:', err)
         // History load failed — derive projects from live tasks, filtering worktree paths
         const projects = [...new Set(list.map((t) => t.originalWorkspace ?? t.workspace))]
         set({ tasks, projects, connected: true })
@@ -804,6 +818,11 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         }
         for (const ws of projects) {
           if (!projectIds[ws]) projectIds[ws] = crypto.randomUUID()
+        }
+        // Reconcile task projectId to match current projectIds map
+        for (const t of Object.values(tasks)) {
+          const ws = t.originalWorkspace ?? t.workspace
+          if (projectIds[ws]) t.projectId = projectIds[ws]
         }
         const softDeleted: Record<string, import('@/types').SoftDeletedThread> = {}
         const deletedTaskIds = new Set<string>()
@@ -845,11 +864,18 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   persistHistory: async () => {
-    const { tasks, projectNames, projectIds, softDeleted } = get()
-    await Promise.all([
-      historyStore.saveThreads(tasks, projectNames, projectIds),
-      historyStore.saveSoftDeleted(Object.values(softDeleted)),
-    ])
+    const { tasks, projects, projectNames, projectIds, softDeleted } = get()
+    console.log(`[taskStore] persistHistory: ${Object.keys(tasks).length} tasks, ${projects.length} projects, ${Object.keys(softDeleted).length} softDeleted`)
+    try {
+      await Promise.all([
+        historyStore.saveThreads(tasks, projectNames, projectIds, projects),
+        historyStore.saveSoftDeleted(Object.values(softDeleted)),
+      ])
+      console.log('[taskStore] persistHistory: success')
+    } catch (err) {
+      console.error('[taskStore] persistHistory: FAILED:', err)
+      throw err
+    }
   },
 
   clearHistory: async () => {
@@ -937,7 +963,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         console.warn('[worktree] Failed to remove worktree during cleanup:', err)
       })
     }
-    get().persistHistory()
+    void get().persistHistory().catch(() => {})
   },
 
   enterBtwMode: (taskId, question) => {

@@ -200,7 +200,7 @@ export function initTaskListeners(): () => void {
 
       // Apply turn end with retry flag so the system message is appropriate
       useTaskStore.setState((s) => applyTurnEnd(s, taskId, stopReason, !alreadyRetried))
-      useTaskStore.getState().persistHistory()
+      void useTaskStore.getState().persistHistory().catch(() => {})
       throttledBackup()
 
       if (!alreadyRetried) {
@@ -272,7 +272,7 @@ export function initTaskListeners(): () => void {
     }
 
     // Persist history after turn ends
-    useTaskStore.getState().persistHistory()
+    void useTaskStore.getState().persistHistory().catch(() => {})
     throttledBackup()
 
     // Send a native notification when the window is not focused and notifications are enabled

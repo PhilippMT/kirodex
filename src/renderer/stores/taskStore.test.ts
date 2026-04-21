@@ -836,6 +836,44 @@ describe('setConnected', () => {
   })
 })
 
+describe('addProject', () => {
+  it('adds workspace to projects list', () => {
+    useTaskStore.getState().addProject('/my/project')
+    expect(useTaskStore.getState().projects).toContain('/my/project')
+  })
+
+  it('generates a projectId for the workspace', () => {
+    useTaskStore.getState().addProject('/my/project')
+    const ids = useTaskStore.getState().projectIds
+    expect(ids['/my/project']).toBeDefined()
+    expect(ids['/my/project']).toMatch(/^[0-9a-f-]+$/)
+  })
+
+  it('skips duplicate projects', () => {
+    useTaskStore.getState().addProject('/my/project')
+    useTaskStore.getState().addProject('/my/project')
+    const count = useTaskStore.getState().projects.filter((p) => p === '/my/project').length
+    expect(count).toBe(1)
+  })
+
+  it('skips worktree paths', () => {
+    useTaskStore.getState().addProject('/ws/.kiro/worktrees/feat')
+    expect(useTaskStore.getState().projects).not.toContain('/ws/.kiro/worktrees/feat')
+  })
+
+  it('restores soft-deleted threads for the workspace', () => {
+    const task = makeTask({ id: 'sd1', workspace: '/ws', status: 'completed' })
+    useTaskStore.setState({
+      softDeleted: { sd1: { task, deletedAt: new Date().toISOString() } },
+      deletedTaskIds: new Set(['sd1']),
+    })
+    useTaskStore.getState().addProject('/ws')
+    expect(useTaskStore.getState().tasks['sd1']).toBeDefined()
+    expect(useTaskStore.getState().tasks['sd1'].isArchived).toBe(true)
+    expect(useTaskStore.getState().softDeleted['sd1']).toBeUndefined()
+  })
+})
+
 describe('persistHistory', () => {
   it('calls saveThreads with current tasks, projectNames, and projectIds', async () => {
     const { saveThreads } = await import('@/lib/history-store')
@@ -846,6 +884,7 @@ describe('persistHistory', () => {
       expect.objectContaining({ 'task-1': expect.any(Object) }),
       expect.objectContaining({ '/ws': 'My Project' }),
       expect.any(Object),
+      expect.any(Array),
     )
   })
 })

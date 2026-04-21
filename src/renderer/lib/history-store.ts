@@ -65,7 +65,12 @@ export async function loadProjects(): Promise<SavedProject[]> {
 }
 
 /** Persist a snapshot of the current threads */
-export async function saveThreads(tasks: Record<string, AgentTask>, projectNames: Record<string, string>, projectIds: Record<string, string> = {}): Promise<void> {
+export async function saveThreads(
+  tasks: Record<string, AgentTask>,
+  projectNames: Record<string, string>,
+  projectIds: Record<string, string> = {},
+  knownProjects: string[] = [],
+): Promise<void> {
   const threads: SavedThread[] = Object.values(tasks)
     .filter((t) => t.messages.length > 0)
     .map((t) => ({
@@ -89,8 +94,9 @@ export async function saveThreads(tasks: Record<string, AgentTask>, projectNames
     threadsByWorkspace.set(ws, ids)
   }
 
-  const workspaces = [...threadsByWorkspace.keys()]
-  const projects: SavedProject[] = workspaces.map((ws) => ({
+  // Include all known projects, even those with no tasks yet
+  const allWorkspaces = new Set([...threadsByWorkspace.keys(), ...knownProjects])
+  const projects: SavedProject[] = [...allWorkspaces].map((ws) => ({
     workspace: ws,
     ...(projectNames[ws] ? { displayName: projectNames[ws] } : {}),
     ...(projectIds[ws] ? { projectId: projectIds[ws] } : {}),
@@ -139,9 +145,10 @@ export async function persistAndFlush(
   projectNames: Record<string, string>,
   projectIds: Record<string, string>,
   softDeleted: SoftDeletedThread[],
+  knownProjects: string[] = [],
 ): Promise<void> {
   await Promise.all([
-    saveThreads(tasks, projectNames, projectIds),
+    saveThreads(tasks, projectNames, projectIds, knownProjects),
     saveSoftDeleted(softDeleted),
   ])
   await flush()
