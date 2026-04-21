@@ -37,8 +37,8 @@ interface SavedProject {
 
 // ── Store singleton ──────────────────────────────────────────────
 
-const HISTORY_FILE = import.meta.env.DEV ? 'history-dev.json' : 'history.json'
-const BACKUP_FILE = import.meta.env.DEV ? 'history-dev.backup.json' : 'history.backup.json'
+const HISTORY_FILE = 'history.json'
+const BACKUP_FILE = 'history.backup.json'
 
 let _store: LazyStore | null = null
 
@@ -67,7 +67,7 @@ export async function loadProjects(): Promise<SavedProject[]> {
 /** Persist a snapshot of the current threads */
 export async function saveThreads(tasks: Record<string, AgentTask>, projectNames: Record<string, string>, projectIds: Record<string, string> = {}): Promise<void> {
   const threads: SavedThread[] = Object.values(tasks)
-    .filter((t) => !t.isArchived && t.messages.length > 0)
+    .filter((t) => t.messages.length > 0)
     .map((t) => ({
       id: t.id,
       name: t.name,
@@ -128,6 +128,23 @@ export async function loadSoftDeleted(): Promise<SoftDeletedThread[]> {
 export async function saveSoftDeleted(items: SoftDeletedThread[]): Promise<void> {
   const store = await getStore()
   await store.set('softDeleted', items)
+}
+
+/**
+ * Persist all current state and force an immediate write to disk.
+ * This is the "guaranteed save" path used before quit/relaunch.
+ */
+export async function persistAndFlush(
+  tasks: Record<string, AgentTask>,
+  projectNames: Record<string, string>,
+  projectIds: Record<string, string>,
+  softDeleted: SoftDeletedThread[],
+): Promise<void> {
+  await Promise.all([
+    saveThreads(tasks, projectNames, projectIds),
+    saveSoftDeleted(softDeleted),
+  ])
+  await flush()
 }
 
 /** Clear all persisted history */

@@ -13,6 +13,8 @@ vi.mock('@/lib/ipc', () => ({
     forkTask: vi.fn().mockResolvedValue({ id: 'fork-1', name: 'Fork', workspace: '/ws', status: 'paused', createdAt: '', messages: [] }),
     gitWorktreeHasChanges: vi.fn().mockResolvedValue(false),
     gitWorktreeRemove: vi.fn().mockResolvedValue(undefined),
+    addRecentProject: vi.fn().mockResolvedValue(undefined),
+    rebuildRecentMenu: vi.fn().mockResolvedValue(undefined),
   },
 }))
 vi.mock('@/lib/history-store', () => ({
@@ -577,12 +579,15 @@ describe('applyTurnEnd', () => {
     expect(result).toEqual({})
   })
 
-  it('skips processing when task is still running (new turn started)', () => {
+  it('processes running task and sets status to paused', () => {
     const state = baseState({
       tasks: { 't1': makeTask({ id: 't1', status: 'running' }) },
     })
     const result = applyTurnEnd(state, 't1', 'end_turn')
-    expect(result).toEqual({})
+    expect(result.tasks?.['t1'].status).toBe('paused')
+    expect(result.streamingChunks?.['t1']).toBe('')
+    expect(result.thinkingChunks?.['t1']).toBe('')
+    expect(result.liveToolCalls?.['t1']).toEqual([])
   })
 
   it('does not append empty assistant message after pause clears chunks', () => {
@@ -836,7 +841,7 @@ describe('persistHistory', () => {
     const { saveThreads } = await import('@/lib/history-store')
     useTaskStore.getState().upsertTask(makeTask())
     useTaskStore.setState({ projectNames: { '/ws': 'My Project' } })
-    useTaskStore.getState().persistHistory()
+    await useTaskStore.getState().persistHistory()
     expect(saveThreads).toHaveBeenCalledWith(
       expect.objectContaining({ 'task-1': expect.any(Object) }),
       expect.objectContaining({ '/ws': 'My Project' }),

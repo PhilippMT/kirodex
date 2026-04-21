@@ -16,7 +16,7 @@ vi.mock('@tauri-apps/plugin-store', () => ({
   },
 }))
 
-import { loadThreads, loadProjects, saveThreads, toArchivedTasks, clearHistory, loadSoftDeleted, saveSoftDeleted, flush, createBackup, loadBackup } from './history-store'
+import { loadThreads, loadProjects, saveThreads, toArchivedTasks, clearHistory, loadSoftDeleted, saveSoftDeleted, flush, persistAndFlush, createBackup, loadBackup } from './history-store'
 import type { AgentTask, SoftDeletedThread } from '@/types'
 
 beforeEach(() => {
@@ -72,7 +72,7 @@ describe('saveThreads', () => {
     expect(mockSet).toHaveBeenCalledWith('projects', expect.any(Array))
   })
 
-  it('skips archived tasks', async () => {
+  it('persists archived tasks (loaded from history)', async () => {
     const tasks: Record<string, AgentTask> = {
       't1': {
         id: 't1', name: 'Archived', workspace: '/ws', status: 'completed',
@@ -81,7 +81,9 @@ describe('saveThreads', () => {
       },
     }
     await saveThreads(tasks, {})
-    expect(mockSet).toHaveBeenCalledWith('threads', [])
+    expect(mockSet).toHaveBeenCalledWith('threads', expect.arrayContaining([
+      expect.objectContaining({ id: 't1' }),
+    ]))
   })
 
   it('skips tasks with no messages', async () => {
@@ -323,6 +325,34 @@ describe('flush', () => {
   it('forces an immediate save to disk', async () => {
     await flush()
     expect(mockSave).toHaveBeenCalledOnce()
+  })
+})
+
+describe('persistAndFlush', () => {
+  it('saves threads, soft-deleted, and forces flush in one call', async () => {
+    const tasks: Record<string, AgentTask> = {
+      't1': {
+        id: 't1', name: 'Task', workspace: '/ws', status: 'paused',
+        createdAt: '', messages: [{ role: 'user', content: 'hi', timestamp: '' }],
+      },
+    }
+    const softDeleted: SoftDeletedThread[] = [{
+      task: { id: 't2', name: 'Del', workspace: '/ws', status: 'completed', createdAt: '', messages: [] },
+      deletedAt: '2026-04-15T10:00:00Z',
+    }]
+    await persistAndFlush(tasks, { '/ws': 'My Project' }, {}, softDeleted)
+    expect(mockSet).toHaveBeenCalledWith('threads', expect.arrayContaining([
+      expect.objectContaining({ id: 't1' }),
+    ]))
+    expect(mockSet).toHaveBeenCalledWith('softDeleted', softDeleted)
+    expect(mockSave).toHaveBeenCalled()
+  })
+
+  it('flushes even with empty data', async () => {
+    await persistAndFlush({}, {}, {}, [])
+    expect(mockSet).toHaveBeenCalledWith('threads', [])
+    expect(mockSet).toHaveBeenCalledWith('softDeleted', [])
+    expect(mockSave).toHaveBeenCalled()
   })
 })
 

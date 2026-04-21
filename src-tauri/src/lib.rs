@@ -10,6 +10,7 @@ use commands::{acp, analytics, fs_ops, git, kiro_config, pty, settings};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Manager;
 use tauri::Emitter;
+use tauri::Listener;
 
 /// Flag set by the frontend before calling `relaunch()` so the
 /// `CloseRequested` handler skips the quit confirmation dialog.
@@ -29,6 +30,24 @@ fn set_relaunch_flag(flag: tauri::State<'_, RelaunchFlag>) {
 #[tauri::command]
 fn rebuild_recent_menu(app: tauri::AppHandle) {
     rebuild_menu(&app);
+}
+
+/// Emit flush-before-quit and wait for the frontend to signal flush-complete.
+/// Falls back to a 2-second timeout if the frontend never responds.
+fn emit_flush_and_wait(app: &tauri::AppHandle) {
+    let _ = app.emit("app://flush-before-quit", ());
+    let (tx, rx) = std::sync::mpsc::channel();
+    let tx_ack = tx.clone();
+    let _listener = app.once_any("app://flush-complete", move |_| {
+        let _ = tx_ack.send(());
+    });
+    // Safety timeout — don't hang forever if frontend is frozen or already gone
+    let tx_timeout = tx;
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(2000));
+        let _ = tx_timeout.send(());
+    });
+    let _ = rx.recv();
 }
 
 /// Install a global panic hook that logs the panic message and backtrace.
@@ -425,8 +444,7 @@ pub fn run() {
                     // and let the close proceed so `relaunch()` can restart the app.
                     if let Some(flag) = app.try_state::<RelaunchFlag>() {
                         if flag.0.load(Ordering::Acquire) {
-                            let _ = app.emit("app://flush-before-quit", ());
-                            std::thread::sleep(std::time::Duration::from_millis(300));
+                            emit_flush_and_wait(&app);
                             shutdown_app(&app);
                             return;
                         }
@@ -447,10 +465,7 @@ pub fn run() {
                         .buttons(MessageDialogButtons::OkCancelCustom("Quit".to_string(), "Cancel".to_string()))
                         .show(move |confirmed| {
                             if confirmed {
-                                // Tell the frontend to flush persisted state to disk
-                                let _ = app.emit("app://flush-before-quit", ());
-                                // Give the LazyStore time to write (autoSave + flush)
-                                std::thread::sleep(std::time::Duration::from_millis(500));
+                                emit_flush_and_wait(&app);
                                 shutdown_app(&app);
                                 app.exit(0);
                             }

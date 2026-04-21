@@ -99,7 +99,7 @@ export interface TaskStore {
   setTaskMode: (taskId: string, modeId: string) => void
   loadTasks: () => Promise<void>
   setConnected: (v: boolean) => void
-  persistHistory: () => void
+  persistHistory: () => Promise<void>
   clearHistory: () => Promise<void>
   resolveWorktreeCleanup: (remove: boolean) => void
   enterBtwMode: (taskId: string, question: string) => void

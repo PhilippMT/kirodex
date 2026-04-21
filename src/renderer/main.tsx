@@ -79,9 +79,10 @@ window.addEventListener('keydown', (e) => {
 import { installJsInterceptors } from './lib/jsInterceptors'
 installJsInterceptors()
 
-// Safety net: persist thread history before the window closes.
-// We eagerly import the store module so the reference is available synchronously
-// in the beforeunload handler (dynamic import() would be async and never complete).
+// Best-effort fallback: fire async persist before the window closes.
+// This is synchronous — the async promises won't complete before unload.
+// The real persistence guarantee comes from the app://flush-before-quit handler.
+// This exists only for edge cases like browser-level refreshes (Cmd+R).
 let _persistHistory: (() => void) | null = null
 import('./stores/taskStore').then((m) => {
   _persistHistory = () => m.useTaskStore.getState().persistHistory()

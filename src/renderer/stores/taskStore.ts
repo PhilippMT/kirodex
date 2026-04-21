@@ -844,10 +844,12 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     set({ connected: v })
   },
 
-  persistHistory: () => {
+  persistHistory: async () => {
     const { tasks, projectNames, projectIds, softDeleted } = get()
-    historyStore.saveThreads(tasks, projectNames, projectIds).catch(() => {})
-    historyStore.saveSoftDeleted(Object.values(softDeleted)).catch(() => {})
+    await Promise.all([
+      historyStore.saveThreads(tasks, projectNames, projectIds),
+      historyStore.saveSoftDeleted(Object.values(softDeleted)),
+    ])
   },
 
   clearHistory: async () => {

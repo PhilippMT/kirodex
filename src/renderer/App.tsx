@@ -38,6 +38,7 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useUpdateChecker } from "@/hooks/useUpdateChecker";
 import { useSessionTracker } from "@/hooks/useSessionTracker";
 import { startAutoFlush, stopAutoFlush } from "@/lib/analytics-collector";
+import * as historyStore from "@/lib/history-store";
 import { RestartPromptDialog } from "@/components/sidebar/RestartPromptDialog";
 import { WorktreeCleanupDialog } from "@/components/sidebar/WorktreeCleanupDialog";
 import { getVersion } from "@tauri-apps/api/app";
@@ -327,19 +328,31 @@ export function App() {
     let unlistenRecentProject: (() => void) | null = null
     let unlistenFlushBeforeQuit: (() => void) | null = null
     import('@tauri-apps/api/event').then(({ listen }) => {
-      // Rust emits this right before app.exit(0) — flush all state to disk
-      listen('app://flush-before-quit', () => {
-        useTaskStore.getState().persistHistory()
-        import('@/lib/history-store').then((hs) => {
-          const { selectedTaskId, view } = useTaskStore.getState()
-          hs.saveUiState({
+      // Rust emits this right before shutdown — flush all state to disk,
+      // then signal back so Rust can proceed with exit.
+      listen('app://flush-before-quit', async () => {
+        try {
+          const { tasks, projectNames, projectIds, softDeleted, selectedTaskId, view } = useTaskStore.getState()
+          await historyStore.persistAndFlush(
+            tasks,
+            projectNames,
+            projectIds,
+            Object.values(softDeleted),
+          )
+          await historyStore.saveUiState({
             selectedTaskId,
             view,
             sidePanelOpen: sidePanelOpenRef.current,
             sidebarCollapsed: sidebarCollapsedRef.current,
-          }).catch(() => {})
-          hs.flush().catch(() => {})
-        }).catch(() => {})
+          })
+          await historyStore.flush()
+        } catch (err) {
+          console.error('[flush-before-quit] Failed to persist:', err)
+        } finally {
+          // Always signal Rust that flush is done (even on error) to avoid hanging on quit
+          const { emit } = await import('@tauri-apps/api/event')
+          emit('app://flush-complete')
+        }
       }).then((fn) => { unlistenFlushBeforeQuit = fn })
       listen('menu-new-thread', () => {
         const state = useTaskStore.getState()

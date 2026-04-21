@@ -10,7 +10,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 
 /** Flush state, create backup, and set relaunch flag. Call before every relaunch(). */
 export const prepareForRelaunch = async (): Promise<void> => {
-  useTaskStore.getState().persistHistory()
+  await useTaskStore.getState().persistHistory()
   await historyStore.flush()
   await historyStore.createBackup(useSettingsStore.getState().settings)
   await ipc.setRelaunchFlag()
