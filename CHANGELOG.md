@@ -4,7 +4,8 @@
 
 ### Bug fixes
 
-- fix state not persisting across restarts ([`fb235c2`](https://github.com/thabti/kirodex/commit/fb235c20e29b5affd3cc1b911a8488e9e9958b5b))
+- fix state not persisting across restarts ([`fb235c2`](https://github.com/thabti/kirodex/commit/fb235c2))
+- align tests with history persistence changes ([`f22deff`](https://github.com/thabti/kirodex/commit/f22deff))
 
 ## [v0.25.0] - 2026-04-21
 
