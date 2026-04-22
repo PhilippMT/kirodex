@@ -488,11 +488,11 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
       }
     }),
 
-  enqueueMessage: (taskId, message) =>
+  enqueueMessage: (taskId, message, attachments) =>
     set((state) => ({
       queuedMessages: {
         ...state.queuedMessages,
-        [taskId]: [...(state.queuedMessages[taskId] ?? []), message],
+        [taskId]: [...(state.queuedMessages[taskId] ?? []), { text: message, attachments: attachments?.length ? attachments : undefined }],
       },
     })),
 

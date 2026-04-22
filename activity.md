@@ -1,5 +1,17 @@
 # Activity Log
 
+## 2026-04-22 08:31 GST (Dubai)
+### Steering Queue: Preserve image attachments in queued messages
+Queued messages while the agent was running dropped image attachments; only the text string was stored. Changed `queuedMessages` from `Record<string, string[]>` to `Record<string, QueuedMessage[]>` where each entry carries `text` + optional `attachments`. The QueuedMessages component now shows an `IconPhoto` indicator with count tooltip, and displays "Image attachment" as fallback text for image-only messages. Attachments flow through enqueue, steer, and auto-drain paths.
+
+**Modified:** task-store-types.ts, taskStore.ts, ChatPanel.tsx, QueuedMessages.tsx, task-store-listeners.ts, taskStore.test.ts, QueuedMessages.test.tsx
+
+## 2026-04-22 08:30 GST (Dubai)
+### TaskStore: Fix orphaned UUID project entries in sidebar
+When re-adding a previously removed project, `addProject` generated a new UUID but restored soft-deleted threads still carried the old UUID as `projectId`, creating phantom sidebar entries. Fixed three things: (1) `addProject` now sets `projectId` on restored tasks to the new UUID, (2) `removeProject` falls back to matching tasks by `projectId` when workspace match finds nothing (so the trash button works on orphaned entries), (3) `useSidebarTasks` skips orphaned UUID entries with no workspace mapping. TDD approach with 3 new tests.
+
+**Modified:** `src/renderer/stores/taskStore.ts`, `src/renderer/stores/taskStore.test.ts`, `src/renderer/hooks/useSidebarTasks.ts`, `src/renderer/hooks/useSidebarTasks.test.ts`
+
 ## 2026-04-21 15:30 GST (Dubai)
 ### Updater: Fix "Restart now" button not working
 The restart callback was fire-and-forget async — errors in `prepareForRelaunch()` were silently swallowed as unhandled rejections. Made `triggerRestart` properly async, added try/catch with error surfacing to all three restart entry points (RestartPromptDialog, UpdatesCard, AboutDialog), and added loading state to the restart dialog button.

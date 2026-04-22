@@ -1,5 +1,10 @@
-import type { AgentTask, ActivityEntry, ToolCall, PlanStep, SoftDeletedThread, CompactionStatus, Attachment, ProjectFile } from '@/types'
+import type { AgentTask, ActivityEntry, ToolCall, PlanStep, SoftDeletedThread, CompactionStatus, Attachment, ProjectFile, IpcAttachment } from '@/types'
 import type { PastedChunk } from '@/hooks/useChatInput'
+
+export interface QueuedMessage {
+  readonly text: string
+  readonly attachments?: readonly IpcAttachment[]
+}
 
 export interface BtwCheckpoint {
   readonly taskId: string
@@ -29,7 +34,7 @@ export interface TaskStore {
   /** Live tool calls for the current turn (by taskId) */
   liveToolCalls: Record<string, ToolCall[]>
   /** Queued messages per task — typed while agent is running, sent on turn end */
-  queuedMessages: Record<string, string[]>
+  queuedMessages: Record<string, QueuedMessage[]>
   activityFeed: ActivityEntry[]
   connected: boolean
   terminalOpenTasks: Set<string>
@@ -76,8 +81,8 @@ export interface TaskStore {
   updateUsage: (taskId: string, used: number, size: number) => void
   updateCompactionStatus: (taskId: string, status: CompactionStatus, summary?: string) => void
   clearTurn: (taskId: string) => void
-  enqueueMessage: (taskId: string, message: string) => void
-  dequeueMessages: (taskId: string) => string[]
+  enqueueMessage: (taskId: string, message: string, attachments?: IpcAttachment[]) => void
+  dequeueMessages: (taskId: string) => QueuedMessage[]
   removeQueuedMessage: (taskId: string, index: number) => void
   reorderQueuedMessage: (taskId: string, from: number, to: number) => void
   createDraftThread: (workspace: string) => string
