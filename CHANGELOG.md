@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.32.0] - 2026-04-23
+
+### Bug fixes
+
+- remove openssl dynamic linking dependency ([`7e8c4de`](https://github.com/thabti/kirodex/commit/7e8c4de1336d88fe1c2edc657bcd6be7ce4a06aa))
+
 ## [v0.31.0] - 2026-04-23
 
 ### Documentation
