@@ -1,5 +1,23 @@
 # Activity Log
 
+## 2026-04-23 14:55 GST (Dubai)
+### Chat: fix question card options clipped by overflow-y-hidden
+The inner wrapper in MessageList.tsx had `overflow-x-auto overflow-y-hidden` which created a scroll container. Per CSS spec, when one overflow axis is non-visible, the other is treated as auto, not visible. The `overflow-y-hidden` clipped vertical content, hiding QuestionCard options, input, and footer below the question text. Removed both overflow properties since code blocks already handle horizontal scrolling via `.chat-markdown pre { overflow-x: auto }`.
+
+**Modified:** `src/renderer/components/chat/MessageList.tsx`
+
+## 2026-04-23 14:59 GST (Dubai)
+### Crash fallback: add close button so users can dismiss it
+Added a ✕ close button (top-right corner) to the HTML crash-fallback overlay. If the fallback appears incorrectly while the app is running behind it, users can dismiss it instead of being forced to reload.
+
+**Modified:** `index.html`
+
+## 2026-04-23 14:57 GST (Dubai)
+### Crash fallback: fix overlay showing alongside running app
+The crash-fallback div in index.html was never dismissed when React mounted. The 10s setTimeout persisted and could fire even after the app rendered. Fixed by storing the timer on `window.__crashTimer` so it can be cleared, and in main.tsx after `ReactDOM.render()`, clearing the timer and removing the crash-fallback element from the DOM.
+
+**Modified:** `index.html`, `src/renderer/main.tsx`
+
 ## 2026-04-23 14:54 GST (Dubai)
 ### Icons: redesign from square to squircle shape
 Replaced both dev (teal #14B8A6) and prod (blue #0000FF) app icons with a superellipse squircle shape (n=5, 360 points) on transparent background. Generated all platform formats: SVG source, 1024x1024 PNG, macOS .icns (via iconutil), and Windows .ico (via ImageMagick). No text, clean solid color fill.
