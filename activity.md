@@ -1,5 +1,23 @@
 # Activity Log
 
+## 2026-04-23 13:02 GST (Dubai)
+### Crash Recovery: detect corrupted history.json, show recovery UI, reset app data
+Added three-layer crash recovery. history-store.ts now validates the store on first access and auto-resets if corrupted. main.tsx ErrorBoundary shows a recovery screen with Reload and Reset buttons (two-click confirm) instead of a blank screen. index.html has a pre-React fallback that appears after 10s if the JS bundle fails. Added `reset_app_data` Rust command that deletes all files in app_data_dir.
+
+**Modified:** src/renderer/lib/history-store.ts, src/renderer/main.tsx, index.html, src-tauri/src/lib.rs
+
+## 2026-04-23 13:00 GST (Dubai)
+### Homebrew: complete zap cleanup paths in cask definition
+Updated the Homebrew cask at thabti/homebrew-tap to add `uninstall quit:` and complete `zap trash:` paths covering rs.kirodex (confy config), Logs, and WebKit directories.
+
+**Modified:** thabti/homebrew-tap/Casks/kirodex.rb (pushed to GitHub)
+
+## 2026-04-22 17:08 GST (Dubai)
+### Sidebar: Auto-focus project button on add/import
+When a new project is added or imported, the project button in the sidebar now receives keyboard focus, showing the `focus-visible:ring-2` ring. Added `lastAddedProject` state to the task store, set it in `addProject`, and consumed it via an `autoFocus` prop on `ProjectItem` which focuses the button ref and clears the flag.
+
+**Modified:** `src/renderer/stores/task-store-types.ts`, `src/renderer/stores/taskStore.ts`, `src/renderer/components/sidebar/ProjectItem.tsx`, `src/renderer/components/sidebar/TaskSidebar.tsx`
+
 ## 2026-04-22 15:39 GST (Dubai)
 ### Settings: Full UI/UX overhaul of the settings panel
 Overhauled the entire settings panel across 6 files. Added grouped sidebar nav labels (ACCOUNT, SETTINGS, DATA) inspired by reference design. Added dirty state indicator (amber dot on Save button). Fixed SettingsCard default padding from py-1 to py-3, eliminating all !py-4 overrides. Merged Permissions + Worktrees + Sandbox into a single "Workspace" card in General, reducing from 7 sub-sections to 5. Added ConfirmDialog for destructive actions (Clear history, Clear analytics). Expanded font size range from 14-18 to 12-22 with editable number input. Improved keymap search input consistency. Added ARIA roles and labels throughout.

@@ -118,8 +118,8 @@ jobs:
             | Platform | File |
             |----------|------|
             | **macOS** (Apple Silicon) | `.dmg` |
-            | **Linux** (x86_64) | `.deb` / `.AppImage` / `.rpm` |
-            | **Windows** (x86_64) | `.exe` / `.msi` |
+            | **Linux** (x86_64) | `.deb` / `.AppImage` |
+            | **Windows** (x86_64) | `.exe` |
 
             **Homebrew:**
             ```bash
@@ -133,9 +133,33 @@ jobs:
           includeUpdaterJson: true
           args: --config src-tauri/tauri.ci.conf.json ${{ matrix.args }}
 
+  # ── Remove standalone .sig files (updater sigs in .tar.gz.sig / .zip.sig are kept) ──
+  cleanup:
+    needs: build
+    runs-on: ubuntu-22.04
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Delete redundant signature files
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for asset in $(gh release view "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --json assets --jq '.assets[].name'); do
+            case "$asset" in
+              *.deb.sig|*.AppImage.sig|*.exe.sig|*.msi.sig)
+                echo "Deleting $asset"
+                gh release delete-asset "${{ github.ref_name }}" "$asset" \
+                  --repo "${{ github.repository }}" --yes
+                ;;
+            esac
+          done
+
   # ── Update Homebrew tap ──────────────────────────────────────────
   homebrew:
-    needs: build
+    needs: [build, cleanup]
     runs-on: macos-14
     if: startsWith(github.ref, 'refs/tags/v')
 

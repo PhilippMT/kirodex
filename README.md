@@ -51,7 +51,7 @@
 </a>
 <br />
 <a href="https://github.com/thabti/kirodex/releases/latest">
-  🪟 Windows x64 .exe / .msi
+  🪟 Windows x64 .exe
 </a>
 
 <br />
@@ -81,7 +81,7 @@ chmod +x Kirodex_*.AppImage && ./Kirodex_*.AppImage
 **Windows:**
 
 ```powershell
-# Download the .exe installer or .msi from releases
+# Download the .exe installer from releases
 # winget and scoop support coming soon
 ```
 

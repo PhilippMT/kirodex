@@ -11,9 +11,14 @@ cask "kirodex" do
 
   app "Kirodex.app"
 
+  uninstall quit: "com.kirodex.app"
+
   zap trash: [
     "~/Library/Application Support/com.kirodex.app",
+    "~/Library/Application Support/rs.kirodex",
     "~/Library/Caches/com.kirodex.app",
+    "~/Library/Logs/com.kirodex.app",
     "~/Library/Preferences/com.kirodex.app.plist",
+    "~/Library/WebKit/com.kirodex.app",
   ]
 end
