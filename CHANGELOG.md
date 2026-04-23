@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.31.0] - 2026-04-23
+
+### Documentation
+
+- fix first-contribution onboarding (#19) ([`98b8b10`](https://github.com/thabti/kirodex/commit/98b8b10adeac7d96bd518e5844145b683b4de3b0)) — thanks @chriscao99
+
+### Chores
+
+- update downloads.json ([`6c8f40f`](https://github.com/thabti/kirodex/commit/6c8f40f9ee2e15701436088b67f0d0cecdc56970))
+
+### Other changes
+
+- Merge branch 'main' of github.com:thabti/kirodex ([`0e4f913`](https://github.com/thabti/kirodex/commit/0e4f9137ec961463c3d868069f3a4fd02dbda051))
+
 ## [v0.30.0] - 2026-04-23
 
 ### Features
