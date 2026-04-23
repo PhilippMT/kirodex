@@ -32,6 +32,21 @@ fn rebuild_recent_menu(app: tauri::AppHandle) {
     rebuild_menu(&app);
 }
 
+#[tauri::command]
+fn reset_app_data(app: tauri::AppHandle) -> Result<(), String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    if dir.exists() {
+        for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            if path.is_file() {
+                let _ = std::fs::remove_file(&path);
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Install a global panic hook that logs the panic message and backtrace.
 /// This catches panics on *any* thread (background ACP, probe, PTY reader)
 /// that would otherwise vanish silently.
@@ -549,6 +564,8 @@ pub fn run() {
             analytics::analytics_db_size,
             // Relaunch
             set_relaunch_flag,
+            // Reset
+            reset_app_data,
             // Recent projects
             settings::get_recent_projects,
             settings::add_recent_project,
