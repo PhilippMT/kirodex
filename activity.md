@@ -1,5 +1,52 @@
 # Activity Log
 
+## 2026-04-25 00:04 GST (Dubai)
+### UpdateNotifier: fix duplicate toasts and style Sonner toasts
+Fixed the update notification toast spawning 11+ duplicates by using a stable `UPDATE_TOAST_ID` constant instead of a ref-based ID; Sonner now deduplicates by ID. Added dark-themed CSS overrides for Sonner toasts (background, border, shadow, action button) using hardcoded hex values to avoid oklch() WebKit issues. Changed Toaster theme from `system` to `dark`.
+
+**Modified:** `src/renderer/App.tsx`, `src/tailwind.css`
+
+## 2026-04-25 00:04 GST (Dubai)
+### Settings: convert all pages to compact two-column layout
+Rewrote all six settings sections (Account, General, Appearance, Keyboard, Advanced, Archives) to use a new `SettingsGrid` component that places the section label and description in a fixed left column (200px) with controls on the right. Reduced padding, font sizes, and spacing throughout for a denser, more professional layout. Widened the content area from `max-w-2xl` to `max-w-4xl`.
+
+**Modified:**
+- `src/renderer/components/settings/settings-shared.tsx` — added `SettingsGrid`, made `SettingRow`/`SettingsCard`/`SectionHeader` more compact
+- `src/renderer/components/settings/general-section.tsx` — 2-column grid layout
+- `src/renderer/components/settings/appearance-section.tsx` — 2-column grid layout with icon
+- `src/renderer/components/settings/advanced-section.tsx` — 2-column grid layout
+- `src/renderer/components/settings/account-section.tsx` — 2-column grid layout
+- `src/renderer/components/settings/keymap-section.tsx` — 2-column grid layout
+- `src/renderer/components/settings/archives-section.tsx` — 2-column grid layout
+- `src/renderer/components/settings/SettingsPanel.tsx` — widened content area
+
+## 2026-04-25 00:02 GST (Dubai)
+### Settings: merge branding into appearance as two-column layout
+Removed the separate Branding settings section and merged the app icon upload into the Appearance page. The page now uses a two-column grid: the app icon preview with change/reset buttons on the left, and theme, font size, and layout settings on the right.
+
+**Modified:**
+- `src/renderer/components/settings/appearance-section.tsx` — rewrote as 2-column layout with icon upload
+- `src/renderer/components/settings/settings-shared.tsx` — removed branding nav item and section type
+- `src/renderer/components/settings/SettingsPanel.tsx` — removed branding section rendering and import
+- Deleted `src/renderer/components/settings/branding-section.tsx`
+
+## 2026-04-24 23:51 GST (Dubai)
+### Settings: add custom app icon branding feature
+Added a new "Branding" section in Settings that lets users upload a custom image (PNG/JPG/WebP, max 2 MB) to replace the Kirodex app icon. The custom icon appears in the About dialog and the macOS dock (via Cocoa NSApplication setApplicationIconImage). Users can reset to the default icon. The dock icon is applied on save and restored on app startup.
+
+**Modified:**
+- `src-tauri/src/commands/settings.rs` — added `custom_app_icon` field, `set_dock_icon` and `reset_dock_icon` commands
+- `src-tauri/src/lib.rs` — registered new commands
+- `src/renderer/types/index.ts` — added `customAppIcon` to `AppSettings`
+- `src/renderer/stores/settingsStore.ts` — track `customAppIcon` in analytics
+- `src/renderer/lib/ipc.ts` — added `setDockIcon` and `resetDockIcon` wrappers
+- `src/renderer/components/settings/settings-shared.tsx` — added branding section to nav and search
+- `src/renderer/components/settings/branding-section.tsx` — new branding UI component
+- `src/renderer/components/settings/SettingsPanel.tsx` — wired branding section, dock icon on save
+- `src/renderer/components/settings/AboutDialog.tsx` — use custom icon with fallback
+- `src/renderer/App.tsx` — apply dock icon on startup
+- `package.json`, `bun.lock` — added `@tauri-apps/plugin-dialog` v2.7.0
+
 ## 2026-04-24 18:34 GST (Dubai)
 ### Website: add smart OS-detecting download cards
 Replaced the static "Download for macOS" hero button with 4 platform download cards (DMG, EXE, .deb, AppImage). Inline JS detects the visitor's OS via `navigator.userAgent`, highlights the matching card, and fetches the latest release version + asset URLs from the GitHub API. Non-detected platforms render muted but remain clickable.
