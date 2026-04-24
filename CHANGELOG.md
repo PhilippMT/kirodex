@@ -1,5 +1,40 @@
 # Changelog
 
+## [v0.34.0] - 2026-04-24
+
+### Features
+
+- add error state with shake animation and retry button ([`e75f48c`](https://github.com/thabti/kirodex/commit/e75f48c12be97be363240ba44bff1ef033c062b2))
+- replace /btw lightning bolt with message-circle-question icon ([`652cd76`](https://github.com/thabti/kirodex/commit/652cd769df4344a4b9f3b9901e48451960968a8b))
+- replace wrench icon with zap for skills and show "skill: Name" in pills ([`e46fa89`](https://github.com/thabti/kirodex/commit/e46fa890ceedbf61654e8a8ef8af66ecb0fcad3d))
+
+### Bug fixes
+
+- detect fullscreen mode and adjust traffic light padding ([`3b2d902`](https://github.com/thabti/kirodex/commit/3b2d902e50234f813fc064292bb53819ec717605))
+- fix ToolCallDisplay layout for nested TaskList/Subagent cards ([`9578615`](https://github.com/thabti/kirodex/commit/957861522fe1a4d1c46b674d45c774de3d47a748))
+- move working indicator dot above tool calls in timeline ([`67a85ba`](https://github.com/thabti/kirodex/commit/67a85baa1842b64f12cdd565f3eaccc8522187df))
+
+### Styling
+
+- consistent kbd styling in header breadcrumb and settings ([`dd1b794`](https://github.com/thabti/kirodex/commit/dd1b79462144d1fffbe57c818eeb8b3ff42caa6d))
+- consistent kbd styling across chat components ([`7563dc2`](https://github.com/thabti/kirodex/commit/7563dc29932d14c650cd9e16c9ab996d9fe3e302))
+- add shake animation keyframes ([`68d9f34`](https://github.com/thabti/kirodex/commit/68d9f34eb444db5c553579f9fd654b3e1d197df4))
+
+### Refactoring
+
+- upgrade Kbd component with KbdGroup and tooltip-aware styling ([`766d1b8`](https://github.com/thabti/kirodex/commit/766d1b830db301cb7556e73cef69428325d845e9))
+- replace plan toggle button with explicit mode dropdown ([`26597f9`](https://github.com/thabti/kirodex/commit/26597f9101fc66f4f15f342a1b28200e37fbbcfe))
+- rewrite AutoApproveToggle as dropdown with explicit labels ([`4dc52f6`](https://github.com/thabti/kirodex/commit/4dc52f60cfcae30c18601d93a120b01b36037948))
+
+### Documentation
+
+- update activity log with recent changes ([`22ea48a`](https://github.com/thabti/kirodex/commit/22ea48aedf9e582ff367f7dd6061bb96ed9c87e6))
+- update activity log ([`2e75264`](https://github.com/thabti/kirodex/commit/2e752642d36170d06d0ebd5656b9aecf4c143b64))
+
+### Tests
+
+- fix 3 tests to match current deriveTimeline behavior ([`97d3776`](https://github.com/thabti/kirodex/commit/97d37762ccc044bf1e125488c934b1399d39850b))
+
 ## [v0.33.2] - 2026-04-24
 
 ### Bug fixes
