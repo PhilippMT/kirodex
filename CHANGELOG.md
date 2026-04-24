@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.35.0] - 2026-04-25
+
+### Features
+
+- add custom app icon and compact two-column layout ([`33c9a07`](https://github.com/thabti/kirodex/commit/33c9a07a8ce06b1ca86cd0fb9840617bc71f52b7))
+- add smart OS-detecting download cards with GitHub API fetch ([`e5fe1e0`](https://github.com/thabti/kirodex/commit/e5fe1e076a9eac67d935a0d833d6b3d7103449cb))
+
+### Bug fixes
+
+- deduplicate update notification and style Sonner toasts ([`d83860c`](https://github.com/thabti/kirodex/commit/d83860c13aaef087b213f42d9cec38707b29a546))
+
+### Documentation
+
+- update activity log with download cards entry ([`ba6e723`](https://github.com/thabti/kirodex/commit/ba6e723a5ec8170e361b7ca0aaddce47c0ea3090))
+
 ## [v0.34.0] - 2026-04-24
 
 ### Features
