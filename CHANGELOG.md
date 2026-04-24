@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.33.2] - 2026-04-24
+
+### Bug fixes
+
+- resize squircle to Apple HIG 824×824 standard ([`c9fe5b5`](https://github.com/thabti/kirodex/commit/c9fe5b50f56cfae9071fe6657ddad89546d2f0bf))
+
+### Chores
+
+- update downloads.json ([`4739f37`](https://github.com/thabti/kirodex/commit/4739f37044baed62039cc47e05160d538daa4530))
+
+### Other changes
+
+- Merge branch 'main' of github.com:thabti/kirodex ([`c935910`](https://github.com/thabti/kirodex/commit/c9359100054ecb33fa4a3e36e40b78a82d4fb54e))
+
 ## [v0.33.1] - 2026-04-24
 
 ### Bug fixes
