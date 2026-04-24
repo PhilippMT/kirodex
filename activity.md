@@ -1,5 +1,11 @@
 # Activity Log
 
+## 2026-04-24 11:18 GST (Dubai)
+### Icons: match dev and prod icon sizing and spacing
+Replaced edge-to-edge icon.png files with the properly-spaced source versions (dev.png/prod.png) that have macOS-style transparent padding around the rounded square. Regenerated .icns (via iconutil) and .ico (via ImageMagick) for both dev and prod. Both icons now have identical sizing and spacing; only the color differs (teal for dev, blue for prod).
+
+**Modified:** `src-tauri/icons/dev/icon.png`, `src-tauri/icons/dev/icon.icns`, `src-tauri/icons/dev/icon.ico`, `src-tauri/icons/prod/icon.png`, `src-tauri/icons/prod/icon.icns`, `src-tauri/icons/prod/icon.ico`
+
 ## 2026-04-24 10:55 GST (Dubai)
 ### ChatInput: add folder drag-and-drop support
 Added folder detection when dragging paths onto the chat input. Folders are displayed as pills with an IconFolder icon and the folder name (full path on hover). On send, folder paths are prepended as `[Folder: /path]` references. Added `is_directory` Rust IPC command, updated `useAttachments`, `useChatInput`, `ChatInput`, `ChatTextarea`, and `PillsRow`.
