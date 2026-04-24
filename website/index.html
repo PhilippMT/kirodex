@@ -65,16 +65,42 @@
       </span>
     </div>
 
-    <a href="https://github.com/thabti/kirodex/releases/latest"
-       class="inline-flex h-12 items-center gap-2.5 rounded-full bg-white px-8 text-[16px] font-medium text-black transition-all hover:bg-gray-200 no-underline">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-      Download for macOS
-    </a>
-
-    <a href="https://github.com/thabti/kirodex/releases/latest"
-       class="mt-4 text-[14px] text-muted-foreground underline underline-offset-4 decoration-muted-foreground/50 transition-colors hover:text-foreground">
-      Other platforms
-    </a>
+    <!-- Download cards -->
+    <div id="download-cards" class="grid w-full max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
+      <!-- macOS -->
+      <a data-platform="macos" data-pattern="_aarch64.dmg"
+         href="https://github.com/thabti/kirodex/releases/latest"
+         class="download-card" aria-label="Download Kirodex for macOS" tabindex="0">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="mb-2 text-foreground"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+        <span class="text-[14px] font-medium text-foreground">macOS</span>
+        <span class="download-meta text-[12px] text-muted-foreground">.dmg · Apple Silicon</span>
+      </a>
+      <!-- Windows -->
+      <a data-platform="windows" data-pattern="_x64-setup.exe"
+         href="https://github.com/thabti/kirodex/releases/latest"
+         class="download-card" aria-label="Download Kirodex for Windows" tabindex="0">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="mb-2 text-foreground"><path d="M3 12V6.75l6-1.32v6.48L3 12zm6.98.09l.02 6.63-6.98-1.01V12.1l6.96-.01zM10 5.22L19.75 3.5v8.34H10V5.22zm0 13.56V12.16h9.75v8.34L10 18.78z"/></svg>
+        <span class="text-[14px] font-medium text-foreground">Windows</span>
+        <span class="download-meta text-[12px] text-muted-foreground">.exe · x64</span>
+      </a>
+      <!-- Linux .deb -->
+      <a data-platform="linux" data-pattern="_amd64.deb"
+         href="https://github.com/thabti/kirodex/releases/latest"
+         class="download-card" aria-label="Download Kirodex for Linux (deb)" tabindex="0">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="mb-2 text-foreground"><path d="M12.5 2c-1.79 0-2.61 1.46-2.61 2.6 0 .62.14 1.14.33 1.57-.94.52-1.6 1.24-2.08 2.05-.46.77-.73 1.6-.86 2.42-.37-.07-.76-.1-1.18-.05-1.43.16-2.6 1.07-2.6 2.41 0 1.04.67 1.89 1.58 2.3-.14.58-.2 1.2-.14 1.85.2 2.01 1.52 3.6 3.41 4.35.52.2 1.06.35 1.6.42.36.78.98 1.38 1.75 1.58.28.07.57.1.85.1.28 0 .57-.03.85-.1.77-.2 1.39-.8 1.75-1.58.54-.07 1.08-.22 1.6-.42 1.89-.75 3.21-2.34 3.41-4.35.06-.65 0-1.27-.14-1.85.91-.41 1.58-1.26 1.58-2.3 0-1.34-1.17-2.25-2.6-2.41-.42-.05-.81-.02-1.18.05-.13-.82-.4-1.65-.86-2.42-.48-.81-1.14-1.53-2.08-2.05.19-.43.33-.95.33-1.57C15.11 3.46 14.29 2 12.5 2z"/></svg>
+        <span class="text-[14px] font-medium text-foreground">Linux</span>
+        <span class="download-meta text-[12px] text-muted-foreground">.deb · x64</span>
+      </a>
+      <!-- Linux AppImage -->
+      <a data-platform="linux" data-pattern="_amd64.AppImage"
+         href="https://github.com/thabti/kirodex/releases/latest"
+         class="download-card" aria-label="Download Kirodex for Linux (AppImage)" tabindex="0">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="mb-2 text-foreground"><path d="M12.5 2c-1.79 0-2.61 1.46-2.61 2.6 0 .62.14 1.14.33 1.57-.94.52-1.6 1.24-2.08 2.05-.46.77-.73 1.6-.86 2.42-.37-.07-.76-.1-1.18-.05-1.43.16-2.6 1.07-2.6 2.41 0 1.04.67 1.89 1.58 2.3-.14.58-.2 1.2-.14 1.85.2 2.01 1.52 3.6 3.41 4.35.52.2 1.06.35 1.6.42.36.78.98 1.38 1.75 1.58.28.07.57.1.85.1.28 0 .57-.03.85-.1.77-.2 1.39-.8 1.75-1.58.54-.07 1.08-.22 1.6-.42 1.89-.75 3.21-2.34 3.41-4.35.06-.65 0-1.27-.14-1.85.91-.41 1.58-1.26 1.58-2.3 0-1.34-1.17-2.25-2.6-2.41-.42-.05-.81-.02-1.18.05-.13-.82-.4-1.65-.86-2.42-.48-.81-1.14-1.53-2.08-2.05.19-.43.33-.95.33-1.57C15.11 3.46 14.29 2 12.5 2z"/></svg>
+        <span class="text-[14px] font-medium text-foreground">Linux</span>
+        <span class="download-meta text-[12px] text-muted-foreground">.AppImage · x64</span>
+      </a>
+    </div>
+    <p id="download-version" class="mt-3 text-[13px] text-muted-foreground/60"></p>
 
     <!-- Brew install terminal block -->
     <div class="mt-8 w-full max-w-md">
@@ -181,6 +207,36 @@
       </div>
     </div>
   </footer>
+
+  <script>
+    (function () {
+      var ua = navigator.userAgent;
+      var detected = /Mac/.test(ua) ? 'macos' : /Win/.test(ua) ? 'windows' : /Linux/.test(ua) ? 'linux' : null;
+      var cards = document.querySelectorAll('.download-card');
+      var hasActive = false;
+      cards.forEach(function (card) {
+        if (detected && card.getAttribute('data-platform') === detected && !hasActive) {
+          card.classList.add('download-card--active');
+          hasActive = true;
+        } else if (detected) {
+          card.classList.add('download-card--muted');
+        }
+      });
+      fetch('https://api.github.com/repos/thabti/kirodex/releases/latest')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var version = (data.tag_name || '').replace(/^v/, '');
+          if (!version || !data.assets) return;
+          document.getElementById('download-version').textContent = 'v' + version;
+          cards.forEach(function (card) {
+            var pattern = card.getAttribute('data-pattern');
+            var asset = data.assets.find(function (a) { return a.name.indexOf(pattern) !== -1; });
+            if (asset) card.href = asset.browser_download_url;
+          });
+        })
+        .catch(function () {});
+    })();
+  </script>
 
 </body>
 </html>
