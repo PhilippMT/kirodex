@@ -77,6 +77,8 @@ export const ipc = {
     invoke('reset_dock_icon'),
   gitDetect: (path: string): Promise<boolean> =>
     invoke('git_detect', { path }),
+  gitInit: (path: string): Promise<void> =>
+    invoke('git_init', { path }),
   gitListBranches: (cwd: string): Promise<{
     local: Array<{ name: string; current: boolean; worktreeLocked: boolean }>;
     remotes: Record<string, Array<{ name: string; fullRef: string }>>;

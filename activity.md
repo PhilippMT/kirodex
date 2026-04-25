@@ -1,5 +1,23 @@
 # Activity Log
 
+## 2026-04-25 16:02 GST (Dubai)
+### Sidebar: Cmd-key keymap helper overlay for project switching
+Holding Cmd shows `⌘1`–`⌘9` kbd badges next to sidebar projects (first 9). Pressing Cmd+N jumps to the Nth project's most recent thread. Uses a `useModifierKeys` hook with 100ms delayed show / instant hide (T3 Code pattern) to prevent flicker. Replaced the previous Cmd+1-9 thread-jumping with project-jumping.
+
+**Modified:** `src/renderer/hooks/useModifierKeys.ts` (new), `src/renderer/components/sidebar/ProjectItem.tsx`, `src/renderer/components/sidebar/TaskSidebar.tsx`, `src/renderer/hooks/useKeyboardShortcuts.ts`
+
+## 2026-04-25 16:00 GST (Dubai)
+### Git: initialize git repo from header toolbar
+Added `git_init` Tauri command (Rust) using `Repository::init()`, registered it in `lib.rs`, and wired the `gitInit` IPC function. Updated `HeaderToolbar` to detect non-git projects via `gitDetect` on mount; when no repo exists, an "Initialize Git" button replaces the diff stats toolbar. Clicking it initializes the repo and switches to the normal git toolbar.
+
+**Modified:** `src-tauri/src/commands/git.rs`, `src-tauri/src/lib.rs`, `src/renderer/lib/ipc.ts`, `src/renderer/components/header-toolbar.tsx`
+
+## 2026-04-25 15:56 GST (Dubai)
+### Sidebar: drag-to-reorder projects with vertical-only constraint
+Added a "Custom" sort option to the project list sort dropdown. When selected, a grip handle appears on each project and users can drag to reorder vertically. Replaced native HTML5 drag with pointer-event-based drag that constrains movement to the Y axis using a floating clone. The reordered state persists via the store's `reorderProject` action. Drag is disabled for all other sort modes.
+
+**Modified:** `src/renderer/components/sidebar/ProjectItem.tsx`, `src/renderer/components/sidebar/TaskSidebar.tsx`, `src/renderer/hooks/useSidebarTasks.ts`
+
 ## 2026-04-25 00:04 GST (Dubai)
 ### UpdateNotifier: fix duplicate toasts and style Sonner toasts
 Fixed the update notification toast spawning 11+ duplicates by using a stable `UPDATE_TOAST_ID` constant instead of a ref-based ID; Sonner now deduplicates by ID. Added dark-themed CSS overrides for Sonner toasts (background, border, shadow, action button) using hardcoded hex values to avoid oklch() WebKit issues. Changed Toaster theme from `system` to `dark`.

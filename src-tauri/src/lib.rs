@@ -519,6 +519,7 @@ pub fn run() {
             fs_ops::list_small_images,
             // Git
             git::git_detect,
+            git::git_init,
             git::git_list_branches,
             git::git_checkout,
             git::git_create_branch,

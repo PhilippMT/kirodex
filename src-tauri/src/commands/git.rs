@@ -70,6 +70,12 @@ pub fn git_detect(path: String) -> bool {
 }
 
 #[tauri::command]
+pub fn git_init(path: String) -> Result<(), AppError> {
+    Repository::init(&path)?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn git_list_branches(cwd: String) -> Result<BranchInfo, AppError> {
     let repo = Repository::open(&cwd)?;
     let head = repo.head().ok();
@@ -757,6 +763,22 @@ mod tests {
         ensure_gitignore_entry(dir.path(), ".kiro/worktrees/").unwrap();
         let content = std::fs::read_to_string(dir.path().join(".gitignore")).unwrap();
         assert_eq!(content, "node_modules/\n.kiro/worktrees/\n");
+    }
+
+    #[test]
+    fn git_init_creates_repo_in_empty_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(!git_detect(dir.path().to_string_lossy().to_string()));
+        git_init(dir.path().to_string_lossy().to_string()).unwrap();
+        assert!(git_detect(dir.path().to_string_lossy().to_string()));
+    }
+
+    #[test]
+    fn git_init_succeeds_on_existing_repo() {
+        let dir = tempfile::tempdir().unwrap();
+        git_init(dir.path().to_string_lossy().to_string()).unwrap();
+        // Re-init should not error
+        git_init(dir.path().to_string_lossy().to_string()).unwrap();
     }
 
     #[test]
