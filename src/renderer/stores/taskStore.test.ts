@@ -64,6 +64,7 @@ beforeEach(() => {
     terminalOpenTasks: new Set(), pendingWorkspace: null,
     view: 'dashboard', isNewProjectOpen: false, isSettingsOpen: false, projectNames: {},
     btwCheckpoint: null,
+    splitViews: [], activeSplitId: null, focusedPanel: 'left' as const, scrollPositions: {},
   })
 })
 
@@ -1861,5 +1862,257 @@ describe('multi-turn message preservation', () => {
     // Since messages are preserved by reference and status hasn't changed,
     // the bail-out guard should prevent a state update
     expect(tasksBefore).toBe(tasksAfter)
+  })
+})
+
+describe('createSplitView', () => {
+  it('creates a split view and activates it', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 'left-1' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 'right-1' }))
+    const id = useTaskStore.getState().createSplitView('left-1', 'right-1')
+    const state = useTaskStore.getState()
+    expect(state.splitViews).toHaveLength(1)
+    expect(state.splitViews[0]).toEqual({ id, left: 'left-1', right: 'right-1', ratio: 0.5 })
+    expect(state.activeSplitId).toBe(id)
+    expect(state.selectedTaskId).toBe('left-1')
+    expect(state.focusedPanel).toBe('left')
+  })
+
+  it('returns a UUID', () => {
+    const id = useTaskStore.getState().createSplitView('a', 'b')
+    expect(id).toMatch(/^[0-9a-f-]{36}$/)
+  })
+
+  it('allows multiple split views', () => {
+    useTaskStore.getState().createSplitView('a', 'b')
+    const id2 = useTaskStore.getState().createSplitView('c', 'd')
+    expect(useTaskStore.getState().splitViews).toHaveLength(2)
+    // Second one becomes active
+    expect(useTaskStore.getState().activeSplitId).toBe(id2)
+  })
+})
+
+describe('removeSplitView', () => {
+  it('removes a split view by id', () => {
+    const id = useTaskStore.getState().createSplitView('a', 'b')
+    useTaskStore.getState().removeSplitView(id)
+    expect(useTaskStore.getState().splitViews).toHaveLength(0)
+  })
+
+  it('clears activeSplitId if the removed view was active', () => {
+    const id = useTaskStore.getState().createSplitView('a', 'b')
+    expect(useTaskStore.getState().activeSplitId).toBe(id)
+    useTaskStore.getState().removeSplitView(id)
+    expect(useTaskStore.getState().activeSplitId).toBeNull()
+  })
+
+  it('preserves activeSplitId if a different view is removed', () => {
+    const id1 = useTaskStore.getState().createSplitView('a', 'b')
+    const id2 = useTaskStore.getState().createSplitView('c', 'd')
+    // id2 is active
+    useTaskStore.getState().removeSplitView(id1)
+    expect(useTaskStore.getState().activeSplitId).toBe(id2)
+    expect(useTaskStore.getState().splitViews).toHaveLength(1)
+  })
+
+  it('no-ops for unknown id', () => {
+    useTaskStore.getState().createSplitView('a', 'b')
+    useTaskStore.getState().removeSplitView('nonexistent')
+    expect(useTaskStore.getState().splitViews).toHaveLength(1)
+  })
+})
+
+describe('setActiveSplit', () => {
+  it('activates a split view and sets selectedTaskId to left', () => {
+    const id = useTaskStore.getState().createSplitView('left-1', 'right-1')
+    useTaskStore.getState().setActiveSplit(null)
+    expect(useTaskStore.getState().activeSplitId).toBeNull()
+    useTaskStore.getState().setActiveSplit(id)
+    expect(useTaskStore.getState().activeSplitId).toBe(id)
+    expect(useTaskStore.getState().selectedTaskId).toBe('left-1')
+  })
+
+  it('deactivates when called with null', () => {
+    useTaskStore.getState().createSplitView('a', 'b')
+    useTaskStore.getState().setActiveSplit(null)
+    expect(useTaskStore.getState().activeSplitId).toBeNull()
+  })
+
+  it('no-ops when already set to the same id', () => {
+    const id = useTaskStore.getState().createSplitView('a', 'b')
+    const before = useTaskStore.getState()
+    useTaskStore.getState().setActiveSplit(id)
+    // Should be same reference (bail-out guard)
+    expect(useTaskStore.getState().activeSplitId).toBe(before.activeSplitId)
+  })
+})
+
+describe('setSplitRatio', () => {
+  it('updates the active split view ratio', () => {
+    const id = useTaskStore.getState().createSplitView('a', 'b')
+    useTaskStore.getState().setSplitRatio(0.7)
+    const sv = useTaskStore.getState().splitViews.find((v) => v.id === id)
+    expect(sv?.ratio).toBe(0.7)
+  })
+
+  it('clamps ratio to 0.2–0.8', () => {
+    useTaskStore.getState().createSplitView('a', 'b')
+    useTaskStore.getState().setSplitRatio(0.1)
+    expect(useTaskStore.getState().splitViews[0].ratio).toBe(0.2)
+    useTaskStore.getState().setSplitRatio(0.95)
+    expect(useTaskStore.getState().splitViews[0].ratio).toBe(0.8)
+  })
+
+  it('no-ops when no active split', () => {
+    useTaskStore.getState().createSplitView('a', 'b')
+    useTaskStore.getState().setActiveSplit(null)
+    const before = useTaskStore.getState().splitViews
+    useTaskStore.getState().setSplitRatio(0.7)
+    expect(useTaskStore.getState().splitViews).toBe(before)
+  })
+
+  it('only updates the active split view, not others', () => {
+    useTaskStore.getState().createSplitView('a', 'b')
+    const id2 = useTaskStore.getState().createSplitView('c', 'd')
+    // id2 is active
+    useTaskStore.getState().setSplitRatio(0.3)
+    const sv1 = useTaskStore.getState().splitViews[0]
+    const sv2 = useTaskStore.getState().splitViews.find((v) => v.id === id2)
+    expect(sv1.ratio).toBe(0.5) // unchanged
+    expect(sv2?.ratio).toBe(0.3)
+  })
+})
+
+describe('closeSplit', () => {
+  it('deactivates the active split without removing it', () => {
+    const id = useTaskStore.getState().createSplitView('a', 'b')
+    useTaskStore.getState().closeSplit()
+    expect(useTaskStore.getState().activeSplitId).toBeNull()
+    // Split view still exists
+    expect(useTaskStore.getState().splitViews).toHaveLength(1)
+    expect(useTaskStore.getState().splitViews[0].id).toBe(id)
+  })
+
+  it('no-ops when no active split', () => {
+    const before = useTaskStore.getState()
+    useTaskStore.getState().closeSplit()
+    expect(useTaskStore.getState().activeSplitId).toBe(before.activeSplitId)
+  })
+})
+
+describe('saveScrollPosition', () => {
+  it('saves scroll position for a task', () => {
+    useTaskStore.getState().saveScrollPosition('t1', 250)
+    expect(useTaskStore.getState().scrollPositions['t1']).toBe(250)
+  })
+
+  it('updates existing scroll position', () => {
+    useTaskStore.getState().saveScrollPosition('t1', 100)
+    useTaskStore.getState().saveScrollPosition('t1', 500)
+    expect(useTaskStore.getState().scrollPositions['t1']).toBe(500)
+  })
+
+  it('no-ops when value unchanged', () => {
+    useTaskStore.getState().saveScrollPosition('t1', 100)
+    const before = useTaskStore.getState().scrollPositions
+    useTaskStore.getState().saveScrollPosition('t1', 100)
+    expect(useTaskStore.getState().scrollPositions).toBe(before)
+  })
+
+  it('stores positions for multiple tasks independently', () => {
+    useTaskStore.getState().saveScrollPosition('t1', 100)
+    useTaskStore.getState().saveScrollPosition('t2', 200)
+    expect(useTaskStore.getState().scrollPositions['t1']).toBe(100)
+    expect(useTaskStore.getState().scrollPositions['t2']).toBe(200)
+  })
+})
+
+describe('setSelectedTask deactivates split', () => {
+  it('deactivates active split when selecting a thread', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 't1' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 't2' }))
+    useTaskStore.getState().createSplitView('t1', 't2')
+    expect(useTaskStore.getState().activeSplitId).not.toBeNull()
+    useTaskStore.getState().setSelectedTask('t1')
+    expect(useTaskStore.getState().activeSplitId).toBeNull()
+    expect(useTaskStore.getState().selectedTaskId).toBe('t1')
+  })
+
+  it('deactivates split when selecting null', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 't1' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 't2' }))
+    useTaskStore.getState().createSplitView('t1', 't2')
+    useTaskStore.getState().setSelectedTask(null)
+    expect(useTaskStore.getState().activeSplitId).toBeNull()
+  })
+
+  it('preserves split views list when deactivating via setSelectedTask', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 't1' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 't2' }))
+    const id = useTaskStore.getState().createSplitView('t1', 't2')
+    useTaskStore.getState().setSelectedTask('t1')
+    // Split view still saved, just not active
+    expect(useTaskStore.getState().splitViews).toHaveLength(1)
+    expect(useTaskStore.getState().splitViews[0].id).toBe(id)
+  })
+})
+
+describe('removeTask cleans up split views', () => {
+  it('removes split views referencing the deleted task as left', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 't1' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 't2' }))
+    useTaskStore.getState().createSplitView('t1', 't2')
+    useTaskStore.getState().removeTask('t1')
+    expect(useTaskStore.getState().splitViews).toHaveLength(0)
+  })
+
+  it('removes split views referencing the deleted task as right', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 't1' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 't2' }))
+    useTaskStore.getState().createSplitView('t1', 't2')
+    useTaskStore.getState().removeTask('t2')
+    expect(useTaskStore.getState().splitViews).toHaveLength(0)
+  })
+
+  it('clears activeSplitId when the active split is removed', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 't1' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 't2' }))
+    useTaskStore.getState().createSplitView('t1', 't2')
+    expect(useTaskStore.getState().activeSplitId).not.toBeNull()
+    useTaskStore.getState().removeTask('t1')
+    expect(useTaskStore.getState().activeSplitId).toBeNull()
+  })
+
+  it('preserves unrelated split views when a task is removed', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 't1' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 't2' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 't3' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 't4' }))
+    useTaskStore.getState().createSplitView('t1', 't2')
+    const id2 = useTaskStore.getState().createSplitView('t3', 't4')
+    useTaskStore.getState().removeTask('t1')
+    expect(useTaskStore.getState().splitViews).toHaveLength(1)
+    expect(useTaskStore.getState().splitViews[0].id).toBe(id2)
+  })
+})
+
+describe('createDraftThread deactivates split', () => {
+  it('clears activeSplitId when creating a new draft', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 't1' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 't2' }))
+    useTaskStore.getState().createSplitView('t1', 't2')
+    expect(useTaskStore.getState().activeSplitId).not.toBeNull()
+    useTaskStore.getState().createDraftThread('/ws')
+    expect(useTaskStore.getState().activeSplitId).toBeNull()
+  })
+})
+
+describe('setPendingWorkspace deactivates split', () => {
+  it('clears activeSplitId when switching to pending workspace', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 't1' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 't2' }))
+    useTaskStore.getState().createSplitView('t1', 't2')
+    useTaskStore.getState().setPendingWorkspace('/new-ws')
+    expect(useTaskStore.getState().activeSplitId).toBeNull()
   })
 })

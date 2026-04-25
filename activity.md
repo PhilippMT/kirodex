@@ -1,5 +1,11 @@
 # Activity Log
 
+## 2026-04-25 22:59 GST (Dubai)
+### Tests: add split view and scroll position unit tests
+Added 252 lines of tests to `taskStore.test.ts` covering all new split view actions (`createSplitView`, `removeSplitView`, `setActiveSplit`, `setSplitRatio`, `closeSplit`), scroll position saving (`saveScrollPosition`), and interaction tests (`setSelectedTask` deactivating split, `removeTask` cleaning split views, `createDraftThread` and `setPendingWorkspace` deactivating split). All 792 tests pass across 53 files.
+
+**Modified:** `src/renderer/stores/taskStore.test.ts`
+
 ## 2026-04-25 22:30 GST (Dubai)
 ### Split-screen: persistent split views that survive navigation
 Refactored split-screen from ephemeral `splitTaskId` to persistent `splitViews` array model. Split pairings are now saved entries that survive thread creation and navigation. New store fields: `splitViews` (array of `{id, left, right, ratio}`), `activeSplitId` (which split is displayed). New actions: `createSplitView`, `removeSplitView`, `setActiveSplit`. Creating a new thread just deactivates the split without removing the pairing. Added "SPLIT VIEWS" section to the sidebar above projects showing all saved pairings with click-to-activate and X-to-remove.
