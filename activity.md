@@ -1,5 +1,78 @@
 # Activity Log
 
+## 2026-04-26 02:20 GST (Dubai)
+### SplitPanelHeader: replace X with bin icon, fix text overlap
+Replaced the IconX close button with IconTrash in split view panel headers. Made the bin button absolutely positioned with a background color matching the panel state (bg-background for focused, bg-card/50 for unfocused) so text never shows through. Added padding-right on the task name that expands on hover, ensuring text truncates with ellipsis well before the bin icon. Bin icon turns red on hover for clear delete affordance.
+
+**Modified:** `src/renderer/components/chat/SplitPanelHeader.tsx`
+
+## 2026-04-26 02:15 GST (Dubai)
+### AppHeader: fix missing toolbar in split view
+The AppHeader workspace selector read `s.tasks[s.selectedTaskId]?.workspace` which could return null if selectedTaskId wasn't synced yet. Updated to derive the focused task from `focusedPanel` + `activeSplitId` in split view, and also use `originalWorkspace` as the primary workspace (for worktree threads). This ensures the toolbar (terminal, git, diff, open-in-editor) always renders in split view.
+
+**Modified:** `src/renderer/components/AppHeader.tsx`
+
+## 2026-04-26 06:30 GST (Dubai)
+### Website: add dark/light/system theme toggle
+Added a 3-mode theme toggle (sun/monitor/moon) to the nav bar on all 3 website pages. Light mode uses white background, dark text, and adapted cards/borders/scrollbars. System mode follows OS `prefers-color-scheme`. Theme persists via localStorage. Dark mode remains default. Ghost SVG inverts via CSS filter. Changelog timeline colors adapt via CSS classes. Early init script in `<head>` prevents flash.
+
+**Modified:** `website/style.css`, `website/index.html`, `website/changelog.html`, `website/features.html`
+
+## 2026-04-26 02:11 GST (Dubai)
+### Header toolbar: fix terminal toggle to respect focused panel in split view
+The terminal button in the header used `selectedTaskId` which could be stale if the user hadn't clicked inside a panel since the last focus change. Added a `focusedTaskId` selector that derives the correct task from `focusedPanel` + `activeSplitId` in split view, falling back to `selectedTaskId` in single-panel mode. The terminal open state check and toggle now both use `focusedTaskId`.
+
+**Modified:** `src/renderer/components/header-toolbar.tsx`
+
+## 2026-04-26 02:07 GST (Dubai)
+### ChatPanel: fix steer duplicate message bug
+Fixed the race condition causing steered messages to appear twice. Root cause: `handleSteer` called `removeQueuedMessage` AFTER `await ipc.pauseTask()`. The pause triggers an `onTurnEnd` event from the backend, which fires during the await. The `onTurnEnd` handler auto-sends the first queued message (still in the queue at that point). Then `handleSteer` continued and sent the same message again via `sendMessageDirect`. Fix: move `removeQueuedMessage` before the `await ipc.pauseTask()` call so the message is gone from the queue before the backend's turn-end event can auto-send it.
+
+**Modified:** `src/renderer/components/chat/ChatPanel.tsx`
+
+## 2026-04-26 02:06 GST (Dubai)
+### MessageList: rewrite scroll position management
+Rewrote the scroll behavior when navigating between threads. Root cause: `isNearBottomRef` persisted across thread switches, the restore-position effect raced with the auto-scroll effect, and raw `scrollTop = scrollHeight` fired before the virtualizer measured new content. Fix: introduced `pendingScrollRef` that queues either `'bottom'` (default for threads with no saved position) or a numeric saved position. The pending scroll executes after the virtualizer settles (two rAF frames). Auto-scroll now skips when a pending thread-switch scroll is queued. `scrollToBottom` uses `virtualizer.scrollToIndex(last, { align: 'end' })` for accurate positioning.
+
+**Modified:** `src/renderer/components/chat/MessageList.tsx`
+
+## 2026-04-26 06:08 GST (Dubai)
+### Website: overhaul to Klack-style light theme
+Rewrote the marketing website from dark theme to clean white minimalist aesthetic inspired by tryklack.com. Consolidated index.html and features.html into a single page with a large bold hero, concise feature grid (icon + one-liner), platform-detected download button, and minimal footer. Restyled changelog.html for light theme. Deleted features.html.
+
+**Modified:** `website/style.css`, `website/index.html`, `website/changelog.html`
+**Deleted:** `website/features.html`
+
+## 2026-04-26 02:04 GST (Dubai)
+### Tests: add unit tests for pin thread and split view focus isolation
+Added 16 new tests covering pinThread (3), unpinThread (3), pin cleanup on deletion (2), and split view focus isolation (8). Focus isolation tests verify selectedTaskId sync without split deactivation, independent message scoping per panel, history cycling per thread, streaming chunk isolation, queued message isolation, clearTurn isolation, and cross-project split view scoping. All 208 tests pass.
+
+**Modified:** `src/renderer/stores/taskStore.test.ts`
+
+## 2026-04-26 01:56 GST (Dubai)
+### Sidebar: add separator between pinned/split sections and projects
+Added a thin centered 32px divider line between the split views/pinned threads sections and the project list. Only renders when there are split views or pinned threads. Also audited all remaining selectedTaskId reads; fixed BtwOverlay (now accepts taskId prop) and ChatInput compactionStatus selector (now uses taskId prop) — both were reading selectedTaskId at render time, causing wrong-panel data in split view.
+
+**Modified:** `src/renderer/components/sidebar/TaskSidebar.tsx`, `src/renderer/components/chat/BtwOverlay.tsx`, `src/renderer/components/chat/ChatInput.tsx`, `src/renderer/components/chat/ChatPanel.tsx`
+
+## 2026-04-26 01:54 GST (Dubai)
+### Split view: fix focus isolation and navigation
+Fixed six split view issues: (1) drag overlay showing on both panels instead of only the focused one, (2) question card answers targeting the wrong panel's task, (3) message history cycling reading the wrong task, (4) slash commands, mentions, and all selectedTaskId-dependent features now respect the focused panel, (5) clicking a thread that's part of a split view now activates the split view instead of navigating to the individual thread, (6) SplitChatLayout now syncs selectedTaskId on focus change without deactivating the split.
+
+**Modified:** `src/renderer/components/chat/ChatInput.tsx`, `src/renderer/components/chat/ChatMarkdown.tsx`, `src/renderer/components/chat/ChatPanel.tsx`, `src/renderer/components/chat/MessageList.tsx`, `src/renderer/components/chat/QuestionCards.tsx`, `src/renderer/components/chat/SplitChatLayout.tsx`, `src/renderer/components/sidebar/TaskSidebar.tsx`, `src/renderer/hooks/useAttachments.ts`, `src/renderer/hooks/useChatInput.ts`
+
+## 2026-04-26 01:43 GST (Dubai)
+### Split view: update terminology from "compare" to "work side-by-side"
+Changed the split view tooltip in header-toolbar.tsx from "Split view · compare two threads" to "Split view · work side-by-side". Split view is for working on two threads simultaneously, not comparing them. Audited README, AGENTS.md, CLAUDE.md, and docs; no other compare language found for split view.
+
+**Modified:** `src/renderer/components/header-toolbar.tsx`
+
+## 2026-04-26 01:15 GST (Dubai)
+### Sidebar: add pin thread feature
+Added "Pin Thread" feature accessible via right-click context menu on threads. Pinned threads appear in a dedicated "Pinned" section above the project list (below split views) with an amber pin icon. Pins persist across app restarts via the history store. Threads are automatically unpinned when deleted.
+
+**Modified:** `src/renderer/stores/task-store-types.ts`, `src/renderer/stores/taskStore.ts`, `src/renderer/components/sidebar/ThreadItem.tsx`, `src/renderer/components/sidebar/TaskSidebar.tsx`, `src/renderer/lib/history-store.ts`, `src/renderer/App.tsx`
+
 ## 2026-04-26 00:06 GST (Dubai)
 ### UpdateNotifier: convert toast to Radix Dialog modal
 Replaced the Sonner toast-based update notification with a proper Radix Dialog modal featuring an X close button. The new `UpdateAvailableDialog` handles all three states (available, downloading with progress bar, ready to restart) in a single component, replacing both the `UpdateNotifier` function and the `RestartPromptDialog`.

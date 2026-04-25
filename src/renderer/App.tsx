@@ -243,6 +243,13 @@ export function App() {
               }
             }
           }
+          // Restore pinned threads
+          if (ui.pinnedThreadIds && ui.pinnedThreadIds.length > 0) {
+            const validPins = ui.pinnedThreadIds.filter((id) => tasks[id])
+            if (validPins.length > 0) {
+              useTaskStore.setState({ pinnedThreadIds: validPins })
+            }
+          }
         }).catch(() => {})
       })
     });
@@ -295,7 +302,7 @@ export function App() {
       listen('app://flush-before-quit', () => {
         useTaskStore.getState().persistHistory()
         import('@/lib/history-store').then((hs) => {
-          const { selectedTaskId, view, splitViews, activeSplitId } = useTaskStore.getState()
+          const { selectedTaskId, view, splitViews, activeSplitId, pinnedThreadIds } = useTaskStore.getState()
           hs.saveUiState({
             selectedTaskId,
             view,
@@ -303,6 +310,7 @@ export function App() {
             sidebarCollapsed: sidebarCollapsedRef.current,
             splitViews,
             activeSplitId,
+            pinnedThreadIds,
           }).catch(() => {})
           hs.flush().then(() => {
             // Ack the flush so Rust can proceed with shutdown

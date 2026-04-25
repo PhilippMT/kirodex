@@ -65,6 +65,7 @@ beforeEach(() => {
     view: 'dashboard', isNewProjectOpen: false, isSettingsOpen: false, projectNames: {},
     btwCheckpoint: null,
     splitViews: [], activeSplitId: null, focusedPanel: 'left' as const, scrollPositions: {},
+    pinnedThreadIds: [],
   })
 })
 
@@ -2114,5 +2115,208 @@ describe('setPendingWorkspace deactivates split', () => {
     useTaskStore.getState().createSplitView('t1', 't2')
     useTaskStore.getState().setPendingWorkspace('/new-ws')
     expect(useTaskStore.getState().activeSplitId).toBeNull()
+  })
+})
+
+// ── Pin thread ────────────────────────────────────────────────
+
+describe('pinThread', () => {
+  it('adds a thread id to pinnedThreadIds', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 't1' }))
+    useTaskStore.getState().pinThread('t1')
+    expect(useTaskStore.getState().pinnedThreadIds).toEqual(['t1'])
+  })
+
+  it('does not duplicate if already pinned', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 't1' }))
+    useTaskStore.getState().pinThread('t1')
+    useTaskStore.getState().pinThread('t1')
+    expect(useTaskStore.getState().pinnedThreadIds).toEqual(['t1'])
+  })
+
+  it('supports multiple pinned threads', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 't1' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 't2' }))
+    useTaskStore.getState().pinThread('t1')
+    useTaskStore.getState().pinThread('t2')
+    expect(useTaskStore.getState().pinnedThreadIds).toEqual(['t1', 't2'])
+  })
+})
+
+describe('unpinThread', () => {
+  it('removes a thread id from pinnedThreadIds', () => {
+    useTaskStore.getState().pinThread('t1')
+    useTaskStore.getState().unpinThread('t1')
+    expect(useTaskStore.getState().pinnedThreadIds).toEqual([])
+  })
+
+  it('no-ops if thread is not pinned', () => {
+    useTaskStore.getState().pinThread('t1')
+    useTaskStore.getState().unpinThread('t2')
+    expect(useTaskStore.getState().pinnedThreadIds).toEqual(['t1'])
+  })
+
+  it('preserves other pinned threads', () => {
+    useTaskStore.getState().pinThread('t1')
+    useTaskStore.getState().pinThread('t2')
+    useTaskStore.getState().pinThread('t3')
+    useTaskStore.getState().unpinThread('t2')
+    expect(useTaskStore.getState().pinnedThreadIds).toEqual(['t1', 't3'])
+  })
+})
+
+describe('pin cleanup on thread deletion', () => {
+  it('removes pinned thread id when thread is soft-deleted', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 't1' }))
+    useTaskStore.getState().pinThread('t1')
+    expect(useTaskStore.getState().pinnedThreadIds).toContain('t1')
+    useTaskStore.getState().softDeleteTask('t1')
+    expect(useTaskStore.getState().pinnedThreadIds).not.toContain('t1')
+  })
+
+  it('preserves other pins when one thread is deleted', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 't1' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 't2' }))
+    useTaskStore.getState().pinThread('t1')
+    useTaskStore.getState().pinThread('t2')
+    useTaskStore.getState().softDeleteTask('t1')
+    expect(useTaskStore.getState().pinnedThreadIds).toEqual(['t2'])
+  })
+})
+
+// ── Split view focus isolation ────────────────────────────────
+
+describe('split view focus isolation', () => {
+  it('setFocusedPanel switches focus between left and right', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 'left-1' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 'right-1' }))
+    useTaskStore.getState().createSplitView('left-1', 'right-1')
+    expect(useTaskStore.getState().focusedPanel).toBe('left')
+    useTaskStore.getState().setFocusedPanel('right')
+    expect(useTaskStore.getState().focusedPanel).toBe('right')
+  })
+
+  it('selectedTaskId can be updated without deactivating split via direct setState', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 'left-1' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 'right-1' }))
+    useTaskStore.getState().createSplitView('left-1', 'right-1')
+    expect(useTaskStore.getState().selectedTaskId).toBe('left-1')
+    // Simulate what SplitChatLayout does on focus change
+    useTaskStore.setState({ selectedTaskId: 'right-1' })
+    expect(useTaskStore.getState().selectedTaskId).toBe('right-1')
+    // Split should still be active
+    expect(useTaskStore.getState().activeSplitId).not.toBeNull()
+  })
+
+  it('setSelectedTask deactivates split (normal navigation)', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 'left-1' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 'right-1' }))
+    useTaskStore.getState().createSplitView('left-1', 'right-1')
+    expect(useTaskStore.getState().activeSplitId).not.toBeNull()
+    useTaskStore.getState().setSelectedTask('left-1')
+    expect(useTaskStore.getState().activeSplitId).toBeNull()
+  })
+
+  it('each panel has independent messages scoped to its own task', () => {
+    const leftTask = makeTask({
+      id: 'left-1',
+      messages: [
+        { role: 'user', content: 'left message 1', timestamp: '2026-01-01T00:00:00Z' },
+        { role: 'assistant', content: 'left reply', timestamp: '2026-01-01T00:01:00Z' },
+      ],
+    })
+    const rightTask = makeTask({
+      id: 'right-1',
+      messages: [
+        { role: 'user', content: 'right message 1', timestamp: '2026-01-01T00:00:00Z' },
+        { role: 'assistant', content: 'right reply', timestamp: '2026-01-01T00:01:00Z' },
+      ],
+    })
+    useTaskStore.getState().upsertTask(leftTask)
+    useTaskStore.getState().upsertTask(rightTask)
+    useTaskStore.getState().createSplitView('left-1', 'right-1')
+    // Left panel messages
+    const leftMessages = useTaskStore.getState().tasks['left-1'].messages
+    expect(leftMessages).toHaveLength(2)
+    expect(leftMessages[0].content).toBe('left message 1')
+    // Right panel messages
+    const rightMessages = useTaskStore.getState().tasks['right-1'].messages
+    expect(rightMessages).toHaveLength(2)
+    expect(rightMessages[0].content).toBe('right message 1')
+    // They are independent
+    expect(leftMessages[0].content).not.toBe(rightMessages[0].content)
+  })
+
+  it('message history cycling reads from the correct task (not selectedTaskId)', () => {
+    const leftTask = makeTask({
+      id: 'left-1',
+      messages: [
+        { role: 'user', content: 'left user msg', timestamp: '2026-01-01T00:00:00Z' },
+      ],
+    })
+    const rightTask = makeTask({
+      id: 'right-1',
+      messages: [
+        { role: 'user', content: 'right user msg', timestamp: '2026-01-01T00:00:00Z' },
+      ],
+    })
+    useTaskStore.getState().upsertTask(leftTask)
+    useTaskStore.getState().upsertTask(rightTask)
+    useTaskStore.getState().createSplitView('left-1', 'right-1')
+    // selectedTaskId is left-1 by default
+    expect(useTaskStore.getState().selectedTaskId).toBe('left-1')
+    // Simulate right panel reading its own task for history
+    const rightTaskFromStore = useTaskStore.getState().tasks['right-1']
+    const rightUserMsgs = rightTaskFromStore.messages.filter((m) => m.role === 'user')
+    expect(rightUserMsgs).toHaveLength(1)
+    expect(rightUserMsgs[0].content).toBe('right user msg')
+    // Verify it's NOT the left panel's messages
+    const leftTaskFromStore = useTaskStore.getState().tasks['left-1']
+    const leftUserMsgs = leftTaskFromStore.messages.filter((m) => m.role === 'user')
+    expect(leftUserMsgs[0].content).toBe('left user msg')
+    expect(leftUserMsgs[0].content).not.toBe(rightUserMsgs[0].content)
+  })
+
+  it('streaming chunks are scoped per task in split view', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 'left-1' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 'right-1' }))
+    useTaskStore.getState().createSplitView('left-1', 'right-1')
+    useTaskStore.getState().appendChunk('left-1', 'left chunk')
+    useTaskStore.getState().appendChunk('right-1', 'right chunk')
+    expect(useTaskStore.getState().streamingChunks['left-1']).toBe('left chunk')
+    expect(useTaskStore.getState().streamingChunks['right-1']).toBe('right chunk')
+  })
+
+  it('queued messages are scoped per task in split view', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 'left-1', status: 'running' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 'right-1', status: 'running' }))
+    useTaskStore.getState().createSplitView('left-1', 'right-1')
+    useTaskStore.getState().enqueueMessage('left-1', 'queued for left')
+    useTaskStore.getState().enqueueMessage('right-1', 'queued for right')
+    expect(useTaskStore.getState().queuedMessages['left-1']).toHaveLength(1)
+    expect(useTaskStore.getState().queuedMessages['left-1'][0].text).toBe('queued for left')
+    expect(useTaskStore.getState().queuedMessages['right-1']).toHaveLength(1)
+    expect(useTaskStore.getState().queuedMessages['right-1'][0].text).toBe('queued for right')
+  })
+
+  it('clearTurn only affects the specified task', () => {
+    useTaskStore.getState().upsertTask(makeTask({ id: 'left-1' }))
+    useTaskStore.getState().upsertTask(makeTask({ id: 'right-1' }))
+    useTaskStore.getState().createSplitView('left-1', 'right-1')
+    useTaskStore.getState().appendChunk('left-1', 'left data')
+    useTaskStore.getState().appendChunk('right-1', 'right data')
+    useTaskStore.getState().clearTurn('left-1')
+    expect(useTaskStore.getState().streamingChunks['left-1']).toBe('')
+    expect(useTaskStore.getState().streamingChunks['right-1']).toBe('right data')
+  })
+
+  it('split view threads belong to their respective projects', () => {
+    const leftTask = makeTask({ id: 'left-1', workspace: '/project-a' })
+    const rightTask = makeTask({ id: 'right-1', workspace: '/project-b' })
+    useTaskStore.getState().upsertTask(leftTask)
+    useTaskStore.getState().upsertTask(rightTask)
+    useTaskStore.getState().createSplitView('left-1', 'right-1')
+    expect(useTaskStore.getState().tasks['left-1'].workspace).toBe('/project-a')
+    expect(useTaskStore.getState().tasks['right-1'].workspace).toBe('/project-b')
   })
 })
