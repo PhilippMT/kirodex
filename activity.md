@@ -1,5 +1,11 @@
 # Activity Log
 
+## 2026-04-25 23:25 GST (Dubai)
+### BtwOverlay: show permission requests inside btw side question view
+The `/btw` overlay blocked all interaction with the ChatPanel underneath, so ACP permission requests were invisible during side questions. Added `PermissionBanner` rendering inside `BtwOverlay` itself; when a `pendingPermission` exists on the selected task, the banner appears between the response area and the footer hint. Uses the same `ipc.selectPermissionOption` call as ChatPanel.
+
+**Modified:** `src/renderer/components/chat/BtwOverlay.tsx`
+
 ## 2026-04-25 22:59 GST (Dubai)
 ### Tests: add split view and scroll position unit tests
 Added 252 lines of tests to `taskStore.test.ts` covering all new split view actions (`createSplitView`, `removeSplitView`, `setActiveSplit`, `setSplitRatio`, `closeSplit`), scroll position saving (`saveScrollPosition`), and interaction tests (`setSelectedTask` deactivating split, `removeTask` cleaning split views, `createDraftThread` and `setPendingWorkspace` deactivating split). All 792 tests pass across 53 files.
