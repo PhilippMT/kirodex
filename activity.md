@@ -1,5 +1,35 @@
 # Activity Log
 
+## 2026-04-25 16:22 GST (Dubai)
+### QueuedMessages: improve chevron reorder button UX/UI
+Redesigned move up/down chevron buttons in the queued messages list. Increased icon size (3→3.5), added hover background (`hover:bg-accent`), replaced invisible disabled state (`opacity-0`) with visible-but-dimmed (`text-muted-foreground/30` + `cursor-not-allowed`), wrapped each button in a tooltip ("Move up"/"Move down"), improved aria-labels to include message text, and added `tabIndex` management for keyboard navigation.
+
+**Modified:** `src/renderer/components/chat/QueuedMessages.tsx`
+
+## 2026-04-25 16:21 GST (Dubai)
+### Chat: fix tool calls and done text overlap
+Increased virtualizer height estimates across all row types so initial layout doesn't overlap before measurement (assistant-text 80→100, work 52→64, changed-files 48→120, etc.). Increased squashed padding from `pb-1.5` to `pb-2.5` in AssistantTextRow and WorkGroupRow for consistent spacing between consecutive rows.
+
+**Modified:** `src/renderer/components/chat/MessageList.tsx`, `src/renderer/components/chat/AssistantTextRow.tsx`, `src/renderer/components/chat/WorkGroupRow.tsx`
+
+## 2026-04-25 16:15 GST (Dubai)
+### Sidebar: Cmd-key kbd hints on threads (⌘⇧[ / ⌘⇧])
+Added `jumpLabel` prop to ThreadItem. When Cmd is held, the thread before the active one shows `⌘⇧[` and the thread after shows `⌘⇧]`, replacing the timestamp. Passed `isMetaHeld` from TaskSidebar → ProjectItem → ThreadItem.
+
+**Modified:** `src/renderer/components/sidebar/ThreadItem.tsx`, `src/renderer/components/sidebar/ProjectItem.tsx`, `src/renderer/components/sidebar/TaskSidebar.tsx`
+
+## 2026-04-25 16:11 GST (Dubai)
+### Sidebar: improve drag-to-reorder UX and add unit tests
+Replaced the ring-based drag indicator with a thin 2px horizontal line (above/below) showing the exact insertion point. Added `bg-sidebar` to the drag clone so it's opaque. Fixed `sortTasks` to handle the `'custom'` key instead of falling through to recent sort. Added 4 `reorderProject` edge-case tests (no-op, adjacent forward/backward, last-to-first) and 4 custom sort tests (preserves store order, skips activity reorder, preserves task order). All 178 tests pass.
+
+**Modified:** `src/renderer/components/sidebar/ProjectItem.tsx`, `src/renderer/components/sidebar/TaskSidebar.tsx`, `src/renderer/hooks/useSidebarTasks.ts`, `src/renderer/hooks/useSidebarTasks.test.ts`, `src/renderer/stores/taskStore.test.ts`
+
+## 2026-04-25 16:09 GST (Dubai)
+### Shortcuts: Cmd-key overlay for debug, settings, and send
+Added kbd hints for Debug (`⌘⇧D`) and Settings (`⌘,`) in SidebarFooter when Cmd is held. Added `Cmd+Shift+D` shortcut to toggle the debug panel. Changed the chat focus shortcut from `Cmd+L` to `Cmd+Enter` and changed the toolbar hint from always-visible `⌘L` to `⌘⏎` shown only when Cmd is held.
+
+**Modified:** `src/renderer/components/chat/ChatInput.tsx`, `src/renderer/components/chat/ChatToolbar.tsx`, `src/renderer/components/sidebar/SidebarFooter.tsx`, `src/renderer/hooks/useKeyboardShortcuts.ts`
+
 ## 2026-04-25 16:07 GST (Dubai)
 ### Git: unit tests for git_init feature
 Added Rust tests (`git_init_creates_repo_in_empty_dir`, `git_init_succeeds_on_existing_repo`) and frontend tests for HeaderToolbar git init behavior (shows init button, shows diff stats, click transitions). All 21 Rust git tests and 3 frontend tests pass. Committed as `feat(git): add git init support for non-git projects`.
