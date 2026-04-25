@@ -14,3 +14,4 @@ coverage
 .kiro/worktrees/
 website/node_modules
 website/dist
+website/.browse/

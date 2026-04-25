@@ -11,11 +11,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="dist/style.css">
+  <script>
+    (function(){var t=localStorage.getItem('kirodex-theme');if(t==='light')document.documentElement.classList.add('light');else if(t==='system'&&window.matchMedia('(prefers-color-scheme: light)').matches)document.documentElement.classList.add('light');})();
+  </script>
 </head>
 <body>
 
   <!-- ── Nav ─────────────────────────────────────────────────── -->
-  <nav class="fixed top-0 left-0 right-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-md">
+  <nav class="fixed top-0 left-0 right-0 z-50 nav-backdrop backdrop-blur-md">
     <div class="mx-auto flex h-14 max-w-5xl items-center justify-between px-6">
       <a href="./" class="flex items-center gap-2.5 text-[15px] font-bold text-foreground no-underline">
         <img src="assets/icon.png" alt="" width="24" height="24" class="rounded">
@@ -24,6 +27,17 @@
       <div class="flex items-center gap-6 text-[14px] text-muted-foreground">
         <a href="changelog.html" class="text-foreground no-underline">Changelog</a>
         <a href="https://github.com/thabti/kirodex" target="_blank" rel="noopener" class="transition-colors hover:text-foreground no-underline">GitHub ↗</a>
+        <div class="theme-toggle" id="theme-toggle">
+          <button data-theme="light" title="Light mode" aria-label="Light mode">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          </button>
+          <button data-theme="system" title="System preference" aria-label="System preference">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </button>
+          <button data-theme="dark" title="Dark mode" aria-label="Dark mode" class="active">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </button>
+        </div>
       </div>
     </div>
   </nav>
@@ -41,7 +55,7 @@
   </main>
 
   <!-- ── Footer ──────────────────────────────────────────────── -->
-  <footer class="border-t border-[rgba(255,255,255,0.06)] px-6 py-8">
+  <footer class="border-t border-subtle border-[rgba(255,255,255,0.06)] px-6 py-8">
     <div class="mx-auto flex max-w-5xl items-center justify-between">
       <p class="text-[13px] text-muted-foreground">&copy; 2026 Sabeur Thabti</p>
       <div class="flex items-center gap-5 text-[13px] text-muted-foreground">
@@ -68,8 +82,8 @@
             const match = line.match(/## \[(.+?)\](?: - (.+))?/);
             const tag = match ? match[1] : line.slice(3);
             const date = match && match[2] ? match[2] : '';
-            html += `<div class="relative pl-6 border-l border-[rgba(255,255,255,0.08)]">`;
-            html += `<div class="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full border-2 border-[#4444FF] bg-[#0a0a0a]"></div>`;
+            html += `<div class="relative pl-6 border-l changelog-border">`;
+            html += `<div class="absolute -left-1.5 top-1.5 h-3 w-3 rounded-full border-2 border-[#4444FF] changelog-dot-bg"></div>`;
             html += `<div class="flex flex-wrap items-baseline gap-3 mb-4">`;
             html += `<a href="https://github.com/thabti/kirodex/releases/tag/${tag}" target="_blank" rel="noopener" class="text-lg font-semibold text-foreground no-underline hover:text-[#4444FF] transition-colors">${tag}</a>`;
             if (date) html += `<span class="text-[13px] text-muted-foreground">${date}</span>`;
@@ -95,7 +109,7 @@
           if (line.startsWith('- ')) {
             if (!inList) { html += '<ul class="mb-4 space-y-1">'; inList = true; }
             const text = line.slice(2).replace(/\[`?([^`\]]+)`?\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="text-[#4444FF] no-underline hover:underline">$1</a>');
-            html += `<li class="text-[14px] leading-relaxed text-muted-foreground pl-3 relative before:content-[''] before:absolute before:left-0 before:top-[10px] before:h-1 before:w-1 before:rounded-full before:bg-[rgba(255,255,255,0.25)]">${text}</li>`;
+            html += `<li class="text-[14px] leading-relaxed text-muted-foreground pl-3 relative changelog-bullet">${text}</li>`;
             continue;
           }
           if (line.trim() === '' && inList) {
@@ -110,6 +124,36 @@
       }
     };
     renderChangelog();
+  </script>
+
+  <script>
+    (function () {
+      var toggle = document.getElementById('theme-toggle');
+      if (!toggle) return;
+      var buttons = toggle.querySelectorAll('button');
+      var stored = localStorage.getItem('kirodex-theme') || 'dark';
+
+      function applyTheme(theme) {
+        var isLight = theme === 'light' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: light)').matches);
+        document.documentElement.classList.toggle('light', isLight);
+        buttons.forEach(function (btn) {
+          btn.classList.toggle('active', btn.getAttribute('data-theme') === theme);
+        });
+        localStorage.setItem('kirodex-theme', theme);
+      }
+
+      applyTheme(stored);
+
+      buttons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          applyTheme(btn.getAttribute('data-theme'));
+        });
+      });
+
+      window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function () {
+        if (localStorage.getItem('kirodex-theme') === 'system') applyTheme('system');
+      });
+    })();
   </script>
 
 </body>
