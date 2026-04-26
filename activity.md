@@ -1,5 +1,41 @@
 # Activity Log
 
+## 2026-04-26 04:44 GST (Dubai)
+### Update dialog: fix z-index conflict with settings panel
+The update button and its modal were unclickable when the settings panel was open because both used z-50. Bumped UpdateAvailableDialog and RestartPromptDialog to z-[60] via a new `overlayClassName` prop on DialogContent. Refactored UpdatesCard and AboutDialog to use the store's `triggerDownload`/`triggerRestart` instead of creating separate Update objects, and close settings when a download starts so the dialog takes over. Fixed useUpdateChecker to re-check when another component sets status to 'available' with a stale pendingUpdateRef.
+
+**Modified:** `src/renderer/components/ui/dialog.tsx`, `src/renderer/components/UpdateAvailableDialog.tsx`, `src/renderer/components/sidebar/RestartPromptDialog.tsx`, `src/renderer/components/settings/updates-card.tsx`, `src/renderer/components/settings/AboutDialog.tsx`, `src/renderer/hooks/useUpdateChecker.ts`
+
+## 2026-04-26 04:43 GST (Dubai)
+### Split view: performance audit of per-panel selectors
+Audited all new selectors for re-render regressions. Fixed five issues: (1) AutoApproveToggle had a stale closure where the settingsStore selector captured `panelWorkspace` from a previous render; split into separate primitive subscriptions. (2) ChatPanel.isPlanMode called `useSettingsStore.getState()` inside a taskStore selector, creating a stale cross-store read; split into two separate subscriptions combined in render. (3) Every component repeated a 3-hook pattern to resolve the panel task ID; created `usePanelResolvedTaskId()` that skips the `selectedTaskId` subscription when panel context is set. (4) Confirmed WorkingRow/GeneratingIndicator are not hot-path (render once per streaming session, not per token). (5) ModelPicker keeps two subscriptions but both return primitives so `Object.is` bail-out works. Single-panel mode has near-zero overhead: one `useContext` lookup (O(1)) plus one extra primitive selector per component.
+
+**Modified:** `src/renderer/components/chat/PanelContext.tsx`, `src/renderer/components/chat/ModelPicker.tsx`, `src/renderer/components/chat/PlanToggle.tsx`, `src/renderer/components/chat/AutoApproveToggle.tsx`, `src/renderer/components/chat/ChatPanel.tsx`, `src/renderer/components/chat/WorkingRow.tsx`, `src/renderer/components/chat/MessageItem.tsx`, `src/renderer/components/chat/PlanHandoffCard.tsx`, `src/renderer/components/chat/CompactSuggestBanner.tsx`, `src/renderer/components/chat/AgentPanel.tsx`
+
+## 2026-04-26 04:22 GST (Dubai)
+### Split view: isolate per-panel state (model, mode, project, btw)
+Split view panels now have fully independent state. Previously, changing the model or mode in one panel would update the other because `currentModelId`, `currentModeId`, and `activeWorkspace` were global singletons. Created a `PanelContext` React context that provides each panel's task ID to all child components. Added `taskModels` map to taskStore (mirroring existing `taskModes`). Updated ModelPicker, PlanToggle, AutoApproveToggle, ChatInput, PlanHandoffCard, CompactSuggestBanner, WorkingRow, MessageItem, and AgentPanel to read per-task state via the panel context. BtwOverlay now only renders in the panel whose task entered btw mode. Streaming suppression during btw mode is also scoped per-task.
+
+**Modified:** `src/renderer/components/chat/PanelContext.tsx` (new), `src/renderer/stores/task-store-types.ts`, `src/renderer/stores/taskStore.ts`, `src/renderer/components/chat/ModelPicker.tsx`, `src/renderer/components/chat/PlanToggle.tsx`, `src/renderer/components/chat/AutoApproveToggle.tsx`, `src/renderer/components/chat/ChatPanel.tsx`, `src/renderer/components/chat/ChatInput.tsx`, `src/renderer/components/chat/SplitChatLayout.tsx`, `src/renderer/components/chat/PlanHandoffCard.tsx`, `src/renderer/components/chat/CompactSuggestBanner.tsx`, `src/renderer/components/chat/WorkingRow.tsx`, `src/renderer/components/chat/MessageItem.tsx`, `src/renderer/components/chat/AgentPanel.tsx`
+
+## 2026-04-26 03:55 GST (Dubai)
+### Analytics: slash command mode tracking and estimated token cost
+Slash commands now record which mode (command vs plan) they were invoked in. The SlashCommandChart shows stacked horizontal bars with orange for command mode and purple for plan mode, with backward compatibility for legacy events. Added estimated token cost to the TokensChart using real Claude model pricing (Opus, Sonnet, Haiku tiers). Cost estimation uses the most-used model's pricing with a 75/25 input/output heuristic and displays as a stat row with a disclaimer.
+
+**Modified:** `src/renderer/hooks/useSlashAction.ts`, `src/renderer/lib/analytics-aggregators.ts`, `src/renderer/components/analytics/SlashCommandChart.tsx`, `src/renderer/components/analytics/TokensChart.tsx`, `src/renderer/components/analytics/AnalyticsDashboard.tsx`
+
+## 2026-04-26 03:45 GST (Dubai)
+### Split view: fix split closing unexpectedly after drag-and-drop
+When dragging a file from Finder, the app loses focus. If an agent turn ends during the drag, a notification fires and adds the task to `notifiedTaskIds`. On regaining focus, `handleWindowFocus` called `setSelectedTask` which unconditionally cleared `activeSplitId`, closing the split. Fixed `setSelectedTask` to be split-aware: if the target task is part of the active split, it focuses that panel instead of closing the split. Also made `navigateToNotifiedTask` check for split visibility before navigating.
+
+**Modified:** `src/renderer/stores/taskStore.ts`, `src/renderer/App.tsx`, `src/renderer/stores/taskStore.test.ts`
+
+## 2026-04-26 03:30 GST (Dubai)
+### Sidebar: persist thread and project ordering across save/load/restart
+Project order, thread order within projects, and sort preference now survive app restarts. `saveThreads` accepts the caller's project array instead of rebuilding from task iteration. `loadTasks` restores saved project order. Per-project `threadOrder` arrays are persisted in `SavedProject` and applied when sort is "Custom". Sort preference persists to localStorage. Thread context menu gains Move Up/Down items in custom sort mode.
+
+**Modified:** `src/renderer/lib/history-store.ts`, `src/renderer/stores/task-store-types.ts`, `src/renderer/stores/taskStore.ts`, `src/renderer/hooks/useSidebarTasks.ts`, `src/renderer/components/sidebar/TaskSidebar.tsx`, `src/renderer/components/sidebar/ProjectItem.tsx`, `src/renderer/components/sidebar/ThreadItem.tsx`
+
 ## 2026-04-26 02:55 GST (Dubai)
 ### Git: commit all pending changes
 Committed three groups of changes: header-toolbar terminal toggle simplification, website light/dark/system theme toggle with full CSS overrides, and BtwOverlay component tests. Added `website/.browse/` to `.gitignore`.
