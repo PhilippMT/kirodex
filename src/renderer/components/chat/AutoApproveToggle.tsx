@@ -4,6 +4,14 @@ import { cn } from '@/lib/utils'
 import { ipc } from '@/lib/ipc'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useTaskStore } from '@/stores/taskStore'
+import { usePanelResolvedTaskId } from './PanelContext'
+
+/** Resolve auto-approve for a specific workspace (or fall back to global). */
+export const getAutoApproveForWorkspace = (workspace: string | null): boolean => {
+  const { settings } = useSettingsStore.getState()
+  const projectPref = workspace ? settings.projectPrefs?.[workspace]?.autoApprove : undefined
+  return projectPref !== undefined ? projectPref : (settings.autoApprove ?? false)
+}
 
 export const selectAutoApprove = (s: ReturnType<typeof useSettingsStore.getState>) => {
   const ws = s.activeWorkspace
@@ -24,7 +32,22 @@ const PERMISSIONS: readonly PermissionEntry[] = [
 ] as const
 
 export const AutoApproveToggle = memo(function AutoApproveToggle() {
-  const isAutoApprove = useSettingsStore(selectAutoApprove)
+  const resolvedTaskId = usePanelResolvedTaskId()
+  // Derive workspace from the panel's task, not the global activeWorkspace
+  const panelWorkspace = useTaskStore((s) => {
+    if (!resolvedTaskId) return null
+    const task = s.tasks[resolvedTaskId]
+    return task ? (task.originalWorkspace ?? task.workspace) : null
+  })
+  // Read auto-approve from the panel's workspace.
+  // Both stores are subscribed separately — panelWorkspace is a primitive (string|null)
+  // so Object.is bail-out works. The settings selector re-runs when settings change.
+  const globalAutoApprove = useSettingsStore((s) => s.settings.autoApprove ?? false)
+  const projectAutoApprove = useSettingsStore((s) => {
+    if (!panelWorkspace) return undefined
+    return s.settings.projectPrefs?.[panelWorkspace]?.autoApprove
+  })
+  const isAutoApprove = projectAutoApprove !== undefined ? projectAutoApprove : globalAutoApprove
   const [isOpen, setIsOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -39,29 +62,30 @@ export const AutoApproveToggle = memo(function AutoApproveToggle() {
 
   const handleSelect = useCallback((permissionId: string) => {
     const next = permissionId === 'auto-approve'
-    const { settings, activeWorkspace, setProjectPref, saveSettings } = useSettingsStore.getState()
-    const current = activeWorkspace
-      ? (settings.projectPrefs?.[activeWorkspace]?.autoApprove ?? settings.autoApprove ?? false)
+    const { settings, setProjectPref, saveSettings } = useSettingsStore.getState()
+    const workspace = panelWorkspace
+    const current = workspace
+      ? (settings.projectPrefs?.[workspace]?.autoApprove ?? settings.autoApprove ?? false)
       : (settings.autoApprove ?? false)
     if (next === current) {
       setIsOpen(false)
       return
     }
-    if (activeWorkspace) {
-      setProjectPref(activeWorkspace, { autoApprove: next })
+    if (workspace) {
+      setProjectPref(workspace, { autoApprove: next })
     } else {
       saveSettings({ ...settings, autoApprove: next })
     }
-    const { selectedTaskId, tasks } = useTaskStore.getState()
-    if (selectedTaskId) {
-      const task = tasks[selectedTaskId]
+    const taskId = resolvedTaskId
+    if (taskId) {
+      const task = useTaskStore.getState().tasks[taskId]
       const isLive = task && (task.status === 'running' || task.status === 'pending_permission' || task.status === 'paused')
       if (isLive) {
-        ipc.setAutoApprove(selectedTaskId, next).catch(() => {})
+        ipc.setAutoApprove(taskId, next).catch(() => {})
       }
     }
     setIsOpen(false)
-  }, [])
+  }, [panelWorkspace, resolvedTaskId])
 
   const currentId = isAutoApprove ? 'auto-approve' : 'ask-first'
   const current = PERMISSIONS.find((p) => p.id === currentId) ?? PERMISSIONS[0]
