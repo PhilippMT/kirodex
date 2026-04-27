@@ -1,5 +1,11 @@
 # Activity Log
 
+## 2026-04-27 11:42 GST (Dubai)
+### App: Fix unwanted thread switching on window focus
+Removed the window focus handler that auto-navigated to the last notified task whenever the app regained focus. This caused the user to be yanked to a different project's thread unexpectedly. The handler now clears the notification badge array without switching threads. Clicking a native notification still navigates as expected.
+
+**Modified:** `src/renderer/App.tsx`
+
 ## 2026-04-27 11:38 GST (Dubai)
 ### Chat: Redesigned CleaningReviewCard component
 Created a compact cleaning review/rating card with visible amber stars (hover/focus states, scale animations), avatar with initials fallback, date + cleaning ID metadata row, rating label badge that animates in, and a thank-you footer on submit. Full accessibility: semantic `article` element, ARIA `radiogroup` for stars, `aria-live` regions for dynamic content, keyboard navigation on every interactive element, and proper focus-visible outlines.
