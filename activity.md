@@ -1,5 +1,17 @@
 # Activity Log
 
+## 2026-04-27 13:57 GST (Dubai)
+### Chat: Move question cards to bottom of message
+Moved QuestionCards below ReactMarkdown in ChatMarkdown.tsx so the interactive question UI renders after the message text. Previously it appeared at the top, scrolling out of view when the agent wrote long responses below the questions.
+
+**Modified:** `src/renderer/components/chat/ChatMarkdown.tsx`
+
+## 2026-04-27 12:29 GST (Dubai)
+### Notifications: Persistent sidebar badges for background activity
+Improved notification handling so `notifiedTaskIds` persist until the user navigates to the thread. Window focus no longer clears them. Added an orange dot badge in the sidebar `ThreadItem` for threads with pending notifications. The badge clears when the user clicks the thread (via `setSelectedTask`) or clicks a native notification.
+
+**Modified:** `src/renderer/App.tsx`, `src/renderer/components/sidebar/ThreadItem.tsx`, `src/renderer/stores/taskStore.ts`
+
 ## 2026-04-27 11:42 GST (Dubai)
 ### App: Fix unwanted thread switching on window focus
 Removed the window focus handler that auto-navigated to the last notified task whenever the app regained focus. This caused the user to be yanked to a different project's thread unexpectedly. The handler now clears the notification badge array without switching threads. Clicking a native notification still navigates as expected.
