@@ -141,6 +141,8 @@ export const ipc = {
     invoke('pty_resize', { id, cols, rows }),
   ptyKill: (id: string): Promise<void> =>
     invoke('pty_kill', { id }),
+  ptyCount: (): Promise<number> =>
+    invoke('pty_count'),
   getKiroConfig: (projectPath?: string): Promise<KiroConfig> =>
     invoke('get_kiro_config', { projectPath }),
   readFile: (filePath: string): Promise<string | null> =>

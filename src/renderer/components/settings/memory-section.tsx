@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { IconRefresh, IconTrash, IconAlertTriangle } from '@tabler/icons-react'
+import { IconRefresh, IconTrash, IconAlertTriangle, IconTerminal2 } from '@tabler/icons-react'
 import { useTaskStore } from '@/stores/taskStore'
 import { useDebugStore } from '@/stores/debugStore'
 import { useJsDebugStore } from '@/stores/jsDebugStore'
 import { measureMemory, formatBytes, type MemoryReport, type ThreadMemoryBreakdown } from '@/lib/thread-memory'
+import { ipc } from '@/lib/ipc'
 import { cn } from '@/lib/utils'
+import type { AppSettings } from '@/types'
+import { Switch } from '@/components/ui/switch'
 import { SectionHeader, SettingsCard, SettingsGrid, SettingRow, Divider, ConfirmDialog } from './settings-shared'
 
 const REFRESH_INTERVAL_MS = 2000
@@ -13,6 +16,14 @@ const REFRESH_INTERVAL_MS = 2000
 const HOT_THREAD_BYTES = 5 * 1024 * 1024
 /** Threshold above which the whole renderer is flagged as hot. */
 const HOT_TOTAL_BYTES = 100 * 1024 * 1024
+
+/** Cell-byte estimate for one ghostty-web scrollback line. ~80 cols × 16 B/cell. */
+const BYTES_PER_SCROLLBACK_LINE = 80 * 16
+
+const DEFAULT_SCROLLBACK = 2000
+const MIN_SCROLLBACK = 200
+const MAX_SCROLLBACK = 20000
+const DEFAULT_IDLE_MINS = 30
 
 const StatusDot = ({ status }: { status: string }) => {
   const color =
@@ -113,9 +124,18 @@ const readHeap = (): { used: number; total: number } | null => {
   return { used: perf.memory.usedJSHeapSize, total: perf.memory.totalJSHeapSize }
 }
 
-export const MemorySection = () => {
+const clampScrollback = (n: number): number =>
+  Math.max(MIN_SCROLLBACK, Math.min(MAX_SCROLLBACK, Math.floor(n)))
+
+interface MemorySectionProps {
+  readonly draft: AppSettings
+  readonly updateDraft: (patch: Partial<AppSettings>) => void
+}
+
+export const MemorySection = ({ draft, updateDraft }: MemorySectionProps) => {
   const [report, setReport] = useState<MemoryReport | null>(null)
   const [heap, setHeap] = useState<{ used: number; total: number } | null>(null)
+  const [ptyCount, setPtyCount] = useState<number | null>(null)
   const [tick, setTick] = useState(0)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [isPurgeOpen, setIsPurgeOpen] = useState(false)
@@ -138,6 +158,11 @@ export const MemorySection = () => {
     )
     setReport(next)
     setHeap(readHeap())
+    let cancelled = false
+    ipc.ptyCount()
+      .then((n) => { if (!cancelled) setPtyCount(n) })
+      .catch(() => { if (!cancelled) setPtyCount(null) })
+    return () => { cancelled = true }
   }, [tick])
 
   const handleManualRefresh = useCallback(() => setTick((n) => n + 1), [])
@@ -158,6 +183,13 @@ export const MemorySection = () => {
 
   const isHot = report ? report.grandTotal >= HOT_TOTAL_BYTES : false
   const debugLogTotal = report ? report.debugLog + report.jsDebugLog : 0
+
+  const scrollback = clampScrollback(draft.terminalScrollback ?? DEFAULT_SCROLLBACK)
+  const idleMins = draft.terminalAutoCloseIdleMins ?? null
+  const idleEnabled = idleMins !== null
+  const ptyScrollbackEstimate = ptyCount !== null
+    ? ptyCount * scrollback * BYTES_PER_SCROLLBACK_LINE
+    : 0
 
   return (
     <>
@@ -181,6 +213,13 @@ export const MemorySection = () => {
                 label="Soft-deleted"
                 value={report ? `${report.softDeletedCount}` : '—'}
                 hint={report ? `${formatBytes(report.softDeleted)} pending purge` : undefined}
+              />
+              <Stat
+                label="Open PTYs"
+                value={ptyCount === null ? '—' : `${ptyCount}`}
+                hint={ptyCount !== null && ptyCount > 0
+                  ? `~${formatBytes(ptyScrollbackEstimate)} scrollback budget`
+                  : 'this window'}
               />
               {heap && (
                 <Stat
@@ -258,6 +297,70 @@ export const MemorySection = () => {
         </SettingsCard>
       </SettingsGrid>
 
+      <SettingsGrid label="Terminal" description="Tune memory held by terminal tabs">
+        <SettingsCard>
+          <SettingRow
+            label="Scrollback lines"
+            description={
+              ptyCount !== null && ptyCount > 0
+                ? `${ptyCount} terminal${ptyCount === 1 ? '' : 's'} open · roughly ${formatBytes(ptyScrollbackEstimate)} held in scrollback at this setting.`
+                : 'Lines retained per terminal. Lower values save memory; higher values keep more history.'
+            }
+          >
+            <input
+              type="number"
+              min={MIN_SCROLLBACK}
+              max={MAX_SCROLLBACK}
+              step={500}
+              value={scrollback}
+              onChange={(e) => updateDraft({ terminalScrollback: clampScrollback(Number(e.target.value) || DEFAULT_SCROLLBACK) })}
+              className="w-24 rounded-md border border-input bg-transparent px-2 py-0.5 text-xs text-foreground outline-none focus:ring-1 focus:ring-ring"
+              aria-label="Terminal scrollback lines"
+            />
+          </SettingRow>
+          <Divider />
+          <SettingRow
+            label="Auto-close idle background tabs"
+            description={
+              idleEnabled
+                ? `Closes background terminal tabs after ${idleMins} minute${idleMins === 1 ? '' : 's'} of no PTY activity. The active tab is never closed.`
+                : 'When enabled, frees memory from terminal tabs you have stopped using. Running processes in those tabs are terminated.'
+            }
+          >
+            <Switch
+              checked={idleEnabled}
+              onCheckedChange={(checked) =>
+                updateDraft({ terminalAutoCloseIdleMins: checked ? DEFAULT_IDLE_MINS : null })
+              }
+              aria-label="Toggle idle terminal auto-close"
+            />
+          </SettingRow>
+          {idleEnabled && (
+            <>
+              <Divider />
+              <SettingRow
+                label="Idle threshold"
+                description="Minutes of no terminal output before a background tab is auto-closed."
+              >
+                <input
+                  type="number"
+                  min={1}
+                  max={1440}
+                  step={5}
+                  value={idleMins ?? DEFAULT_IDLE_MINS}
+                  onChange={(e) => {
+                    const n = Math.max(1, Math.min(1440, Number(e.target.value) || DEFAULT_IDLE_MINS))
+                    updateDraft({ terminalAutoCloseIdleMins: n })
+                  }}
+                  className="w-20 rounded-md border border-input bg-transparent px-2 py-0.5 text-xs text-foreground outline-none focus:ring-1 focus:ring-ring"
+                  aria-label="Idle threshold in minutes"
+                />
+              </SettingRow>
+            </>
+          )}
+        </SettingsCard>
+      </SettingsGrid>
+
       <SettingsGrid label="Reclaim" description="Free held memory">
         <SettingsCard>
           <SettingRow
@@ -302,9 +405,9 @@ export const MemorySection = () => {
         </SettingsCard>
       </SettingsGrid>
 
-      <p className="px-1 pt-1 text-[10.5px] leading-relaxed text-muted-foreground/70">
-        Estimates count UTF-16 byte-equivalents for strings and serialized objects held by the renderer.
-        They reflect Zustand state, not the underlying V8 heap or native memory.
+      <p className="flex items-start gap-1.5 px-1 pt-1 text-[10.5px] leading-relaxed text-muted-foreground/70">
+        <IconTerminal2 className="mt-0.5 size-3 shrink-0" aria-hidden />
+        Scrollback estimates assume ~80 cols × 16 B per cell × the line cap. Real WASM heap usage varies.
       </p>
 
       <ConfirmDialog

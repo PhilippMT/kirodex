@@ -1,5 +1,11 @@
 # Activity Log
 
+## 2026-04-27 18:35 GST (Dubai)
+### Terminal: Per-window PTY scoping, lower scrollback default, idle auto-close
+Reworked PTY lifecycle for memory: PtyState is now keyed by window label (nested HashMap) so closing one window only kills its terminals, fixing a cross-window kill bug where any close drained all PTYs globally. Added `kill_window_ptys` to the secondary-window close path so terminal threads no longer outlive their webview. New `pty_count` IPC command surfaces live PTY count per window. Lowered the default `SCROLLBACK_LINES` from 5 000 to 2 000 (~60% per-terminal reduction) and exposed it as `terminalScrollback` (200–20 000) in Settings → Memory. Added opt-in `terminalAutoCloseIdleMins` that closes background tabs after N minutes of no PTY data — never the active tab, never the last tab. Memory section now shows open PTY count and a scrollback budget estimate.
+
+**Modified:** `src-tauri/src/commands/pty.rs`, `src-tauri/src/lib.rs`, `src/renderer/components/chat/TerminalDrawer.tsx`, `src/renderer/components/settings/SettingsPanel.tsx`, `src/renderer/components/settings/memory-section.tsx`, `src/renderer/components/settings/settings-shared.tsx`, `src/renderer/lib/ipc.ts`, `src/renderer/types/index.ts`
+
 ## 2026-04-27 17:50 GST (Dubai)
 ### Settings: Thread memory monitor + audit
 Added a new "Memory" section under Settings → Data that estimates per-thread memory held by the renderer (messages, tool-call payloads, live-turn buffers, queued messages, soft-deleted threads, drafts, debug logs). Auto-refreshes every 2 s, exposes a JS heap readout when `performance.memory` is available, and provides one-click reclaim actions: purge all soft-deleted threads immediately (instead of waiting 48 h) and clear the in-memory ACP / JS console log buffers. Added `purgeAllSoftDeletes` action to the task store. Pure renderer work; no Rust changes.
