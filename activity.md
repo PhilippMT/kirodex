@@ -1,5 +1,11 @@
 # Activity Log
 
+## 2026-04-27 17:50 GST (Dubai)
+### Settings: Thread memory monitor + audit
+Added a new "Memory" section under Settings → Data that estimates per-thread memory held by the renderer (messages, tool-call payloads, live-turn buffers, queued messages, soft-deleted threads, drafts, debug logs). Auto-refreshes every 2 s, exposes a JS heap readout when `performance.memory` is available, and provides one-click reclaim actions: purge all soft-deleted threads immediately (instead of waiting 48 h) and clear the in-memory ACP / JS console log buffers. Added `purgeAllSoftDeletes` action to the task store. Pure renderer work; no Rust changes.
+
+**Modified:** `src/renderer/components/settings/SettingsPanel.tsx`, `src/renderer/components/settings/settings-shared.tsx`, `src/renderer/components/settings/memory-section.tsx` (new), `src/renderer/lib/thread-memory.ts` (new), `src/renderer/stores/taskStore.ts`, `src/renderer/stores/task-store-types.ts`
+
 ## 2026-04-27 13:57 GST (Dubai)
 ### Chat: Move question cards to bottom of message
 Moved QuestionCards below ReactMarkdown in ChatMarkdown.tsx so the interactive question UI renders after the message text. Previously it appeared at the top, scrolling out of view when the agent wrote long responses below the questions.

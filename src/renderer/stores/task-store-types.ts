@@ -91,6 +91,8 @@ export interface TaskStore {
   restoreTask: (id: string) => void
   permanentlyDeleteTask: (id: string) => void
   purgeExpiredSoftDeletes: () => void
+  /** Drop every soft-deleted thread immediately, regardless of age. */
+  purgeAllSoftDeletes: () => void
   appendChunk: (taskId: string, chunk: string) => void
   appendThinkingChunk: (taskId: string, chunk: string) => void
   upsertToolCall: (taskId: string, toolCall: ToolCall) => void

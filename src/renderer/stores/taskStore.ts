@@ -440,6 +440,17 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     get().persistHistory()
   },
 
+  purgeAllSoftDeletes: () => {
+    const ids = Object.keys(get().softDeleted)
+    if (ids.length === 0) return
+    set((state) => {
+      const deletedTaskIds = new Set(state.deletedTaskIds)
+      for (const id of ids) deletedTaskIds.add(id)
+      return { softDeleted: {}, deletedTaskIds }
+    })
+    get().persistHistory()
+  },
+
   appendChunk: (taskId, chunk) =>
     set((state) => ({
       streamingChunks: {
