@@ -16,6 +16,7 @@ import { GeneralSection } from './general-section'
 import { AppearanceSection } from './appearance-section'
 import { KeymapSection } from './keymap-section'
 import { AdvancedSection } from './advanced-section'
+import { MemorySection } from './memory-section'
 import { ArchivesSection } from './archives-section'
 
 const defaultSettings: AppSettings = {
@@ -302,6 +303,7 @@ export const SettingsPanel = () => {
                   {section === 'appearance' && <AppearanceSection draft={draft} updateDraft={updateDraft} />}
                   {section === 'keymap' && <KeymapSection />}
                   {section === 'advanced' && <AdvancedSection draft={draft} updateDraft={updateDraft} onClose={handleClose} />}
+                  {section === 'memory' && <MemorySection draft={draft} updateDraft={updateDraft} />}
                   {section === 'archives' && <ArchivesSection />}
                 </>
               )}

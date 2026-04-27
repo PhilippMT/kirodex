@@ -112,14 +112,26 @@ fn shutdown_app(app: &tauri::AppHandle) {
     // Kill all PTY sessions
     if let Some(pty_state) = app.try_state::<pty::PtyState>() {
         let mut ptys = pty_state.0.lock();
-        let count = ptys.len();
-        ptys.clear(); // Drop impl kills child processes and waits
-        if count > 0 {
-            log::info!("Killed {} PTY session(s)", count);
+        let total: usize = ptys.values().map(|m| m.len()).sum();
+        ptys.clear(); // Drop impl on each PtyInstance kills its child and waits
+        if total > 0 {
+            log::info!("Killed {} PTY session(s)", total);
         }
     }
 
     log::info!("Shutdown completed in {:?}", start.elapsed());
+}
+
+/// Kill every PTY belonging to a single window. Called when a non-last
+/// window closes so its terminals don't leak until app exit (and so that
+/// closing one window doesn't bleed into another window's PTYs).
+fn kill_window_ptys(app: &tauri::AppHandle, window_label: &str) {
+    if let Some(pty_state) = app.try_state::<pty::PtyState>() {
+        let killed = pty_state.kill_window(window_label);
+        if killed > 0 {
+            log::info!("Killed {} PTY session(s) for window '{}'", killed, window_label);
+        }
+    }
 }
 
 /// Re-position the macOS traffic light buttons (close, minimize, zoom) to match
@@ -463,8 +475,12 @@ pub fn run() {
                     }
 
                     let window_count = app.webview_windows().len();
-                    // Secondary windows close without confirmation
+                    // Secondary windows close without confirmation, but their
+                    // PTYs must die with them — otherwise terminals from the
+                    // closed window stay in our map and the reader threads
+                    // keep emitting to a dead webview.
                     if window_count > 1 {
+                        kill_window_ptys(&app, window.label());
                         return;
                     }
                     // Last window — show quit confirmation
@@ -569,6 +585,7 @@ pub fn run() {
             pty::pty_write,
             pty::pty_resize,
             pty::pty_kill,
+            pty::pty_count,
             // Kiro config
             kiro_config::get_kiro_config,
             // Analytics
