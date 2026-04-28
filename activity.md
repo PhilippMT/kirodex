@@ -1,5 +1,11 @@
 # Activity Log
 
+## 2026-04-28 13:19 GST (Dubai)
+### Model Icons: Add GLM, Qwen, and MiniMax provider icons
+Added three new model providers to `model-icons.tsx`: GLM/ChatGLM (Zhipu AI, #4268FA), Qwen (Alibaba, #615CED), and MiniMax (#F23F5D). Each gets a Provider type entry, regex detection pattern, branded SVG component, and ICON_MAP entry. Build passes clean.
+
+**Modified:** `src/renderer/lib/model-icons.tsx`
+
 ## 2026-04-28 09:15 GST (Dubai)
 ### Updater: Fix "Restart now" button hanging and crashing the app
 The restart flow was double-flushing: `prepareForRelaunch()` flushed state to disk, then `relaunch()` triggered `CloseRequested`, and the Rust handler emitted `app://flush-before-quit` expecting an ack from a webview that was already being torn down. The ack never arrived, causing a 2s timeout followed by `shutdown_app()` blocking on ACP cleanup. Fixed by skipping the flush-before-quit/ack cycle when `RelaunchFlag` is set, since the frontend already flushed before calling `relaunch()`.
