@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.40.3] - 2026-04-29
+
+### Features
+
+- auto-refresh config when .kiro files change on disk ([`c20b7e4`](https://github.com/thabti/kirodex/commit/c20b7e4ac1927132081af655c19eaa76b610a798))
+- add GLM, Qwen, and MiniMax model provider icons ([`82acfb1`](https://github.com/thabti/kirodex/commit/82acfb1ecf8a689a649c21fbbe0a8c0aa4643dc9))
+
+### Chores
+
+- update downloads.json ([`456be66`](https://github.com/thabti/kirodex/commit/456be66f408c1458d9ab515f232175dcace5e161))
+
+### Other changes
+
+- Merge branches 'main' and 'main' of github.com:thabti/kirodex ([`e111779`](https://github.com/thabti/kirodex/commit/e111779a90794486e3228cf23c9eff36be897213))
+
 ## [v0.40.2] - 2026-04-28
 
 ### Bug fixes
