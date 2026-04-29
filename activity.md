@@ -1,5 +1,11 @@
 # Activity Log
 
+## 2026-04-29 13:39 GST (Dubai)
+### MCP: Start exposing scope + advanced fields
+Extended parsed MCP server entries to include `scope` (global vs project) plus raw `oauth` and `tools` config blocks, so the upcoming MCP configuration UI can be built on top of structured data rather than only the raw JSON editor.
+
+**Modified:** src-tauri/src/commands/kiro_config.rs, src/renderer/types/index.ts
+
 ## 2026-04-29 07:52 GST (Dubai)
 ### Tests: Fix 14 failing unit tests across 3 test files
 Fixed test failures caused by source code evolving ahead of test mocks. kiroStore.test.ts needed `onKiroConfigChanged` added to the ipc mock (3 failures). taskStore.test.ts needed the `persistHistory` assertion updated from 3 to 6 args matching the new `saveThreads` signature (1 failure). SidebarFooter.test.tsx needed mocks for `jsDebugStore`, `useModifierKeys`, and `thread-memory` to prevent `measureMemory` crashing on undefined `tasks` (10 failures). All 822 tests now pass.

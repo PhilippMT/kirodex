@@ -35,6 +35,7 @@ pub struct KiroSteeringRule {
 pub struct KiroMcpServer {
     pub name: String,
     pub enabled: bool,
+    pub scope: String,
     pub transport: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub command: Option<String>,
@@ -42,6 +43,10 @@ pub struct KiroMcpServer {
     pub args: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oauth: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     pub file_path: String,
@@ -210,12 +215,15 @@ fn load_mcp_file(file_path: &Path, enabled: bool, out: &mut Vec<KiroMcpServer>) 
         out.push(KiroMcpServer {
             name: name.clone(),
             enabled,
+            scope: if file_path.to_string_lossy().contains("/.kiro/") { "project".to_string() } else { "global".to_string() },
             transport: if has_url { "http".to_string() } else { "stdio".to_string() },
             command: cfg.get("command").and_then(|v| v.as_str()).map(String::from),
             args: cfg.get("args").and_then(|v| v.as_array()).map(|a| {
                 a.iter().filter_map(|v| v.as_str().map(String::from)).collect()
             }),
             url: cfg.get("url").and_then(|v| v.as_str()).map(String::from),
+            oauth: cfg.get("oauth").cloned(),
+            tools: cfg.get("tools").cloned(),
             error,
             file_path: fp.clone(),
         });
