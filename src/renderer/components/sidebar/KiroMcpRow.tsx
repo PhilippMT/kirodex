@@ -1,11 +1,12 @@
 import { memo } from 'react'
-import { IconCircle } from '@tabler/icons-react'
+import { IconCircle, IconExternalLink } from '@tabler/icons-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { ipc } from '@/lib/ipc'
 import { cn } from '@/lib/utils'
 import type { KiroMcpServer } from '@/types'
-import { type ViewerState } from './kiro-config-helpers'
+import { SourceDot } from './kiro-config-helpers'
 
-export const McpRow = memo(function McpRow({ server, onOpen }: { server: KiroMcpServer; onOpen: (v: ViewerState) => void }) {
+export const McpRow = memo(function McpRow({ server, onEdit }: { server: KiroMcpServer; onEdit: (server: KiroMcpServer) => void }) {
   const dotClass = !server.enabled
     ? 'fill-muted-foreground text-muted-foreground'
     : server.status === 'error' || server.status === 'needs-auth'
@@ -18,15 +19,29 @@ export const McpRow = memo(function McpRow({ server, onOpen }: { server: KiroMcp
         <li
           role="button"
           tabIndex={0}
-          onClick={() => server.filePath && onOpen({ filePath: server.filePath, title: `MCP: ${server.name}` })}
-          onKeyDown={(e) => e.key === 'Enter' && server.filePath && onOpen({ filePath: server.filePath, title: `MCP: ${server.name}` })}
+          onClick={() => onEdit(server)}
+          onKeyDown={(e) => e.key === 'Enter' && onEdit(server)}
           className={cn(
             'flex h-6 min-w-0 w-full items-center gap-1.5 rounded-md px-1.5 text-[11px] cursor-pointer',
             'text-muted-foreground/80 hover:bg-accent/50 hover:text-foreground transition-colors',
           )}
         >
           <IconCircle className={cn('size-2 shrink-0', dotClass)} aria-hidden />
+          <SourceDot source={server.source} />
           <span className="min-w-0 flex-1 truncate">{server.name}</span>
+          {server.oauthUrl && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                ipc.openUrl(server.oauthUrl!).catch(() => {})
+              }}
+              className="shrink-0 rounded text-red-600 hover:text-red-500 dark:text-red-400"
+              aria-label={`Authenticate ${server.name}`}
+            >
+              <IconExternalLink className="size-3" />
+            </button>
+          )}
           <span className="shrink-0 text-[9px] text-muted-foreground">{server.transport}</span>
         </li>
       </TooltipTrigger>

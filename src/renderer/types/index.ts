@@ -210,10 +210,15 @@ export interface KiroSteeringRule {
 export interface KiroMcpServer {
   name: string
   enabled: boolean
-  transport: 'stdio' | 'http'
+  transport: 'stdio' | 'http' | 'sse' | 'streamable-http'
+  source: 'global' | 'local'
   command?: string
   args?: string[]
   url?: string
+  env?: Record<string, string>
+  headers?: Record<string, string>
+  autoApprove?: string[]
+  disabledTools?: string[]
   error?: string
   filePath: string
   status?: 'connecting' | 'ready' | 'needs-auth' | 'error'

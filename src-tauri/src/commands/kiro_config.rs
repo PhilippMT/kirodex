@@ -1,6 +1,9 @@
 use serde::Serialize;
+use serde_json::{Map, Value};
+use super::error::AppError;
+use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -36,12 +39,21 @@ pub struct KiroMcpServer {
     pub name: String,
     pub enabled: bool,
     pub transport: String,
+    pub source: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub command: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub env: Option<BTreeMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub headers: Option<BTreeMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auto_approve: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disabled_tools: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     pub file_path: String,
@@ -191,35 +203,160 @@ fn scan_root_steering(kiro_dir: &Path, is_global: bool, existing: &[KiroSteering
         .collect()
 }
 
-fn load_mcp_file(file_path: &Path, enabled: bool, out: &mut Vec<KiroMcpServer>) {
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct McpConfigPaths {
+    pub global_path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_path: Option<String>,
+}
+
+fn string_array(cfg: &Value, key: &str) -> Option<Vec<String>> {
+    cfg.get(key).and_then(|v| v.as_array()).map(|a| {
+        a.iter().filter_map(|v| v.as_str().map(String::from)).collect()
+    })
+}
+
+fn string_map(cfg: &Value, key: &str) -> Option<BTreeMap<String, String>> {
+    cfg.get(key).and_then(|v| v.as_object()).map(|obj| {
+        obj.iter()
+            .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+            .collect()
+    }).filter(|m: &BTreeMap<String, String>| !m.is_empty())
+}
+
+fn mcp_error(cfg: &Value, transport: &str) -> Option<String> {
+    let has_url = cfg.get("url").and_then(|v| v.as_str()).is_some();
+    let has_command = cfg.get("command").and_then(|v| v.as_str()).is_some();
+    if transport == "stdio" && !has_command {
+        return Some("Missing command".to_string());
+    }
+    if transport != "stdio" && !has_url {
+        return Some("Missing url".to_string());
+    }
+    if let Some(url) = cfg.get("url").and_then(|v| v.as_str()) {
+        let is_local_http = url.starts_with("http://localhost")
+            || url.starts_with("http://127.0.0.1")
+            || url.starts_with("http://[::1]");
+        if !(url.starts_with("https://") || is_local_http) {
+            return Some("Remote MCP URLs must use HTTPS or localhost HTTP".to_string());
+        }
+    }
+    None
+}
+
+fn load_mcp_file(file_path: &Path, enabled_file: bool, is_global: bool, out: &mut Vec<KiroMcpServer>) {
     let Ok(content) = fs::read_to_string(file_path) else { return };
     let Ok(raw) = serde_json::from_str::<serde_json::Value>(&content) else { return };
     let Some(servers) = raw.get("mcpServers").and_then(|v| v.as_object()) else { return };
     let fp = file_path.to_string_lossy().to_string();
+    let source = source_str(is_global).to_string();
     for (name, cfg) in servers {
         let has_url = cfg.get("url").and_then(|v| v.as_str()).is_some();
-        let has_command = cfg.get("command").and_then(|v| v.as_str()).is_some();
-        let error = if !has_url && !has_command {
-            Some("Missing command or url".to_string())
+        let transport = if let Some(t) = cfg.get("transport").and_then(|v| v.as_str()) {
+            t.to_string()
         } else if has_url {
-            let url = cfg["url"].as_str().unwrap_or("");
-            if !url.starts_with("http") { Some("Invalid url".to_string()) } else { None }
+            "http".to_string()
         } else {
-            None
+            "stdio".to_string()
         };
+        let disabled = cfg.get("disabled").and_then(|v| v.as_bool()).unwrap_or(false);
+        let error = mcp_error(cfg, &transport);
         out.push(KiroMcpServer {
             name: name.clone(),
-            enabled,
-            transport: if has_url { "http".to_string() } else { "stdio".to_string() },
+            enabled: enabled_file && !disabled,
+            transport,
+            source: source.clone(),
             command: cfg.get("command").and_then(|v| v.as_str()).map(String::from),
-            args: cfg.get("args").and_then(|v| v.as_array()).map(|a| {
-                a.iter().filter_map(|v| v.as_str().map(String::from)).collect()
-            }),
+            args: string_array(cfg, "args"),
             url: cfg.get("url").and_then(|v| v.as_str()).map(String::from),
+            env: string_map(cfg, "env"),
+            headers: string_map(cfg, "headers"),
+            auto_approve: string_array(cfg, "autoApprove"),
+            disabled_tools: string_array(cfg, "disabledTools"),
             error,
             file_path: fp.clone(),
         });
     }
+}
+
+fn mcp_path(project_path: Option<&str>, disabled: bool) -> Result<PathBuf, AppError> {
+    let filename = if disabled { "mcp-disabled.json" } else { "mcp.json" };
+    if let Some(project) = project_path {
+        return Ok(Path::new(project).join(".kiro").join("settings").join(filename));
+    }
+    let home = dirs::home_dir().ok_or_else(|| AppError::Other("Could not resolve home directory".to_string()))?;
+    Ok(home.join(".kiro").join("settings").join(filename))
+}
+
+fn read_mcp_json(path: &Path) -> Result<Value, AppError> {
+    if !path.exists() {
+        return Ok(serde_json::json!({ "mcpServers": {} }));
+    }
+    let raw = fs::read_to_string(path)?;
+    if raw.trim().is_empty() {
+        return Ok(serde_json::json!({ "mcpServers": {} }));
+    }
+    Ok(serde_json::from_str(&raw)?)
+}
+
+fn ensure_mcp_servers_object(root: &mut Value) -> Result<&mut Map<String, Value>, AppError> {
+    if !root.is_object() {
+        *root = serde_json::json!({ "mcpServers": {} });
+    }
+    let obj = root.as_object_mut().ok_or_else(|| AppError::Other("Invalid MCP JSON root".to_string()))?;
+    let servers = obj.entry("mcpServers").or_insert_with(|| Value::Object(Map::new()));
+    if !servers.is_object() {
+        *servers = Value::Object(Map::new());
+    }
+    servers.as_object_mut().ok_or_else(|| AppError::Other("Invalid mcpServers object".to_string()))
+}
+
+fn normalize_mcp_config(mut config: Value) -> Result<Value, AppError> {
+    let obj = config.as_object_mut().ok_or_else(|| AppError::Other("MCP server config must be a JSON object".to_string()))?;
+    obj.remove("name");
+    obj.remove("enabled");
+    let transport = obj.get("transport").and_then(|v| v.as_str()).unwrap_or_else(|| {
+        if obj.get("url").is_some() { "http" } else { "stdio" }
+    }).to_string();
+    if transport == "stdio" {
+        obj.remove("url");
+        obj.remove("headers");
+    } else {
+        obj.remove("command");
+        obj.remove("args");
+        if transport == "http" {
+            obj.remove("transport");
+        }
+    }
+    Ok(config)
+}
+
+fn write_mcp_server_to_path(path: &Path, server_name: &str, config: Value) -> Result<(), AppError> {
+    let name = server_name.trim();
+    if name.is_empty() || name.contains('/') || name.contains('\\') {
+        return Err(AppError::Other("MCP server name must not be empty or contain path separators".to_string()));
+    }
+    let mut root = read_mcp_json(path)?;
+    let servers = ensure_mcp_servers_object(&mut root)?;
+    servers.insert(name.to_string(), normalize_mcp_config(config)?);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(path, serde_json::to_string_pretty(&root)?)?;
+    Ok(())
+}
+
+fn delete_mcp_server_from_path(path: &Path, server_name: &str) -> Result<(), AppError> {
+    if !path.exists() {
+        return Ok(());
+    }
+    let mut root = read_mcp_json(path)?;
+    if let Some(servers) = root.get_mut("mcpServers").and_then(|v| v.as_object_mut()) {
+        servers.remove(server_name);
+    }
+    fs::write(path, serde_json::to_string_pretty(&root)?)?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -231,8 +368,8 @@ pub fn get_kiro_config(project_path: Option<String>) -> KiroConfig {
         config.agents.extend(scan_agents(&global_kiro, true));
         config.skills.extend(scan_skills(&global_kiro, true));
         config.steering_rules.extend(scan_steering(&global_kiro, true));
-        load_mcp_file(&global_kiro.join("settings").join("mcp.json"), true, &mut config.mcp_servers);
-        load_mcp_file(&global_kiro.join("settings").join("mcp-disabled.json"), false, &mut config.mcp_servers);
+        load_mcp_file(&global_kiro.join("settings").join("mcp.json"), true, true, &mut config.mcp_servers);
+        load_mcp_file(&global_kiro.join("settings").join("mcp-disabled.json"), false, true, &mut config.mcp_servers);
     }
 
     if let Some(ref project) = project_path {
@@ -242,11 +379,37 @@ pub fn get_kiro_config(project_path: Option<String>) -> KiroConfig {
         config.steering_rules.extend(scan_steering(&local_kiro, false));
         let root_rules = scan_root_steering(&local_kiro, false, &config.steering_rules);
         config.steering_rules.extend(root_rules);
-        load_mcp_file(&local_kiro.join("settings").join("mcp.json"), true, &mut config.mcp_servers);
-        load_mcp_file(&local_kiro.join("settings").join("mcp-disabled.json"), false, &mut config.mcp_servers);
+        load_mcp_file(&local_kiro.join("settings").join("mcp.json"), true, false, &mut config.mcp_servers);
+        load_mcp_file(&local_kiro.join("settings").join("mcp-disabled.json"), false, false, &mut config.mcp_servers);
     }
 
     config
+}
+
+#[tauri::command]
+pub fn get_mcp_config_paths(project_path: Option<String>) -> Result<McpConfigPaths, AppError> {
+    Ok(McpConfigPaths {
+        global_path: mcp_path(None, false)?.to_string_lossy().to_string(),
+        project_path: project_path.as_deref()
+            .map(|p| mcp_path(Some(p), false).map(|path| path.to_string_lossy().to_string()))
+            .transpose()?,
+    })
+}
+
+#[tauri::command]
+pub fn save_mcp_server(project_path: Option<String>, server_name: String, config: Value) -> Result<(), AppError> {
+    let path = mcp_path(project_path.as_deref(), false)?;
+    write_mcp_server_to_path(&path, &server_name, config)?;
+    let disabled_path = mcp_path(project_path.as_deref(), true)?;
+    delete_mcp_server_from_path(&disabled_path, &server_name)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_mcp_server(project_path: Option<String>, server_name: String) -> Result<(), AppError> {
+    delete_mcp_server_from_path(&mcp_path(project_path.as_deref(), false)?, &server_name)?;
+    delete_mcp_server_from_path(&mcp_path(project_path.as_deref(), true)?, &server_name)?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -365,11 +528,12 @@ mod tests {
         let f = tmp.path().join("mcp.json");
         std::fs::write(&f, r#"{"mcpServers": {"slack": {"command": "slack-mcp", "args": ["--token", "abc"]}}}"#).unwrap();
         let mut servers = Vec::new();
-        super::load_mcp_file(&f, true, &mut servers);
+        super::load_mcp_file(&f, true, false, &mut servers);
         assert_eq!(servers.len(), 1);
         assert_eq!(servers[0].name, "slack");
         assert!(servers[0].enabled);
         assert_eq!(servers[0].transport, "stdio");
+        assert_eq!(servers[0].source, "local");
         assert!(servers[0].error.is_none());
     }
 
@@ -379,7 +543,7 @@ mod tests {
         let f = tmp.path().join("mcp.json");
         std::fs::write(&f, r#"{"mcpServers": {"gh": {"url": "https://gh.mcp"}}}"#).unwrap();
         let mut servers = Vec::new();
-        super::load_mcp_file(&f, false, &mut servers);
+        super::load_mcp_file(&f, false, false, &mut servers);
         assert_eq!(servers[0].transport, "http");
         assert!(!servers[0].enabled);
     }
@@ -390,8 +554,8 @@ mod tests {
         let f = tmp.path().join("mcp.json");
         std::fs::write(&f, r#"{"mcpServers": {"broken": {}}}"#).unwrap();
         let mut servers = Vec::new();
-        super::load_mcp_file(&f, true, &mut servers);
-        assert_eq!(servers[0].error.as_deref(), Some("Missing command or url"));
+        super::load_mcp_file(&f, true, false, &mut servers);
+        assert_eq!(servers[0].error.as_deref(), Some("Missing command"));
     }
 
     #[test]
@@ -400,14 +564,14 @@ mod tests {
         let f = tmp.path().join("mcp.json");
         std::fs::write(&f, r#"{"mcpServers": {"bad": {"url": "not-a-url"}}}"#).unwrap();
         let mut servers = Vec::new();
-        super::load_mcp_file(&f, true, &mut servers);
-        assert_eq!(servers[0].error.as_deref(), Some("Invalid url"));
+        super::load_mcp_file(&f, true, false, &mut servers);
+        assert_eq!(servers[0].error.as_deref(), Some("Remote MCP URLs must use HTTPS or localhost HTTP"));
     }
 
     #[test]
     fn load_mcp_file_nonexistent_is_noop() {
         let mut servers = Vec::new();
-        super::load_mcp_file(std::path::Path::new("/nonexistent/mcp.json"), true, &mut servers);
+        super::load_mcp_file(std::path::Path::new("/nonexistent/mcp.json"), true, false, &mut servers);
         assert!(servers.is_empty());
     }
 
@@ -424,5 +588,66 @@ mod tests {
         let (always_apply, excerpt) = super::parse_steering_frontmatter(input);
         assert!(always_apply);
         assert_eq!(excerpt, "");
+    }
+
+    #[test]
+    fn load_mcp_file_preserves_supported_configuration_keys() {
+        let tmp = tempfile::tempdir().unwrap();
+        let f = tmp.path().join("mcp.json");
+        std::fs::write(&f, r#"{"mcpServers":{"api":{"url":"https://api.example.com/mcp","transport":"sse","headers":{"Authorization":"Bearer ${TOKEN}"},"env":{"DEBUG":"true"},"autoApprove":["read"],"disabledTools":["delete"],"disabled":true}}}"#).unwrap();
+        let mut servers = Vec::new();
+        super::load_mcp_file(&f, true, true, &mut servers);
+        assert_eq!(servers[0].transport, "sse");
+        assert_eq!(servers[0].source, "global");
+        assert!(!servers[0].enabled);
+        assert_eq!(servers[0].headers.as_ref().unwrap().get("Authorization").unwrap(), "Bearer ${TOKEN}");
+        assert_eq!(servers[0].env.as_ref().unwrap().get("DEBUG").unwrap(), "true");
+        assert_eq!(servers[0].auto_approve.as_ref().unwrap(), &vec!["read".to_string()]);
+        assert_eq!(servers[0].disabled_tools.as_ref().unwrap(), &vec!["delete".to_string()]);
+    }
+
+    #[test]
+    fn write_mcp_server_to_path_saves_pretty_json() {
+        let tmp = tempfile::tempdir().unwrap();
+        let f = tmp.path().join(".kiro").join("settings").join("mcp.json");
+        super::write_mcp_server_to_path(
+            &f,
+            "api",
+            serde_json::json!({
+                "url": "https://api.example.com/mcp",
+                "headers": { "Authorization": "Bearer ${TOKEN}" },
+                "disabled": false,
+                "name": "ignored",
+                "enabled": true
+            }),
+        ).unwrap();
+        let raw = std::fs::read_to_string(&f).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        let server = &json["mcpServers"]["api"];
+        assert_eq!(server["url"], "https://api.example.com/mcp");
+        assert!(server.get("name").is_none());
+        assert!(server.get("enabled").is_none());
+    }
+
+    #[test]
+    fn write_mcp_server_to_path_removes_remote_only_keys_for_stdio() {
+        let tmp = tempfile::tempdir().unwrap();
+        let f = tmp.path().join("mcp.json");
+        super::write_mcp_server_to_path(
+            &f,
+            "local",
+            serde_json::json!({
+                "transport": "stdio",
+                "command": "uvx",
+                "args": ["mcp-server-fetch"],
+                "url": "https://unused.example.com",
+                "headers": { "Authorization": "nope" }
+            }),
+        ).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&f).unwrap()).unwrap();
+        let server = &json["mcpServers"]["local"];
+        assert_eq!(server["command"], "uvx");
+        assert!(server.get("url").is_none());
+        assert!(server.get("headers").is_none());
     }
 }

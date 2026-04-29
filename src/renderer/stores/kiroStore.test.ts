@@ -13,9 +13,9 @@ import { useKiroStore, initKiroListeners } from './kiroStore'
 import { ipc } from '@/lib/ipc'
 
 const makeMcpServers = () => [
-  { name: 'Slack', enabled: true, transport: 'stdio' as const, command: 'slack-mcp', filePath: '/p' },
-  { name: 'GitHub', enabled: true, transport: 'http' as const, url: 'https://gh.mcp', filePath: '/p2' },
-  { name: 'Disabled', enabled: false, transport: 'stdio' as const, command: 'x', filePath: '/p3' },
+  { name: 'Slack', enabled: true, transport: 'stdio' as const, source: 'global' as const, command: 'slack-mcp', filePath: '/p' },
+  { name: 'GitHub', enabled: true, transport: 'http' as const, source: 'global' as const, url: 'https://gh.mcp', filePath: '/p2' },
+  { name: 'Disabled', enabled: false, transport: 'stdio' as const, source: 'local' as const, command: 'x', filePath: '/p3' },
 ]
 
 beforeEach(() => {

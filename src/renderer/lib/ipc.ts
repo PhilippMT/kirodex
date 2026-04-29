@@ -145,6 +145,12 @@ export const ipc = {
     invoke('pty_count'),
   getKiroConfig: (projectPath?: string): Promise<KiroConfig> =>
     invoke('get_kiro_config', { projectPath }),
+  getMcpConfigPaths: (projectPath?: string): Promise<{ globalPath: string; projectPath?: string }> =>
+    invoke('get_mcp_config_paths', { projectPath }),
+  saveMcpServer: (projectPath: string | undefined, serverName: string, config: Record<string, unknown>): Promise<void> =>
+    invoke('save_mcp_server', { projectPath, serverName, config }),
+  deleteMcpServer: (projectPath: string | undefined, serverName: string): Promise<void> =>
+    invoke('delete_mcp_server', { projectPath, serverName }),
   watchKiroPath: (path: string): Promise<void> =>
     invoke('watch_kiro_path', { path }),
   unwatchKiroPath: (path: string): Promise<void> =>

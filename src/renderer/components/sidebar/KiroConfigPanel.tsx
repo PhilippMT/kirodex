@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { IconRobot, IconBolt, IconCompass, IconChevronRight, IconSearch, IconPlug } from '@tabler/icons-react'
+import { IconRobot, IconBolt, IconCompass, IconChevronRight, IconSearch, IconPlug, IconSettings, IconPlus } from '@tabler/icons-react'
 import { useKiroStore } from '@/stores/kiroStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { ipc } from '@/lib/ipc'
@@ -11,6 +11,8 @@ import { AgentRow, AgentStackGroup } from './KiroAgentSection'
 import { SkillRow } from './KiroSkillRow'
 import { SteeringRow } from './KiroSteeringRow'
 import { McpRow } from './KiroMcpRow'
+import { KiroMcpManager } from './KiroMcpManager'
+import type { KiroMcpServer } from '@/types'
 
 export const KiroConfigPanel = memo(function KiroConfigPanel({
   collapsed,
@@ -42,6 +44,8 @@ export const KiroConfigPanel = memo(function KiroConfigPanel({
   const [searching, setSearching] = useState(false)
   const [search, setSearch] = useState('')
   const [viewer, setViewer] = useState<ViewerState | null>(null)
+  const [mcpManagerOpen, setMcpManagerOpen] = useState(false)
+  const [editingMcp, setEditingMcp] = useState<KiroMcpServer | null>(null)
 
   useEffect(() => { void loadConfig(activeWorkspace ?? undefined) }, [loadConfig, activeWorkspace])
 
@@ -91,6 +95,19 @@ export const KiroConfigPanel = memo(function KiroConfigPanel({
   const mcpErrorCount = filteredMcp.filter((m) => m.status === 'error' || m.status === 'needs-auth').length
   const openViewer = useCallback((v: ViewerState) => setViewer(v), [])
   const closeViewer = useCallback(() => setViewer(null), [])
+  const openMcpManager = useCallback((server?: KiroMcpServer) => {
+    setEditingMcp(server ?? null)
+    setMcpManagerOpen(true)
+  }, [])
+  const closeMcpManager = useCallback(() => setMcpManagerOpen(false), [])
+  const handleMcpChanged = useCallback(() => {
+    useKiroStore.setState({ configs: {} })
+    void loadConfig(activeWorkspace ?? undefined)
+  }, [activeWorkspace, loadConfig])
+  const openMcpJson = useCallback((v: ViewerState) => {
+    setMcpManagerOpen(false)
+    setViewer(v)
+  }, [])
 
   if (!loaded) {
     return (
@@ -99,8 +116,6 @@ export const KiroConfigPanel = memo(function KiroConfigPanel({
       </div>
     )
   }
-
-  if (agents.length === 0 && skills.length === 0 && steeringRules.length === 0 && mcpServers.length === 0) return null
 
   const noResults = !!search && totalAgents === 0 && filteredSkills.length === 0 && filteredRules.length === 0 && filteredMcp.length === 0
 
@@ -162,12 +177,25 @@ export const KiroConfigPanel = memo(function KiroConfigPanel({
               </ul>
             )}
 
-            {mcpServers.length > 0 && (filteredMcp.length > 0 || !search) && (
-              <SectionToggle icon={IconPlug} iconColor="text-sky-600 dark:text-sky-400" label="MCP" count={filteredMcp.length} errorCount={mcpErrorCount} expanded={mcpOpen} onToggle={() => setMcpOpen((v) => !v)} />
+            {(mcpServers.length > 0 || !search) && (
+              <div className="group relative">
+                <SectionToggle icon={IconPlug} iconColor="text-sky-600 dark:text-sky-400" label="MCP" count={filteredMcp.length} errorCount={mcpErrorCount} expanded={mcpOpen} onToggle={() => setMcpOpen((v) => !v)} />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    openMcpManager()
+                  }}
+                  className="absolute right-9 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground opacity-80 hover:bg-accent hover:text-foreground group-hover:opacity-100"
+                  aria-label={mcpServers.length > 0 ? 'Manage MCP servers' : 'Add MCP server'}
+                >
+                  {mcpServers.length > 0 ? <IconSettings className="size-3.5" /> : <IconPlus className="size-3.5" />}
+                </button>
+              </div>
             )}
             {mcpOpen && filteredMcp.length > 0 && (
               <ul className="flex min-w-0 flex-col gap-px border-l mx-1 px-1.5 py-px" style={{ borderColor: 'var(--border)' }}>
-                {filteredMcp.map((server) => <McpRow key={server.name} server={server} onOpen={openViewer} />)}
+                {filteredMcp.map((server) => <McpRow key={`${server.source}-${server.name}`} server={server} onEdit={openMcpManager} />)}
               </ul>
             )}
 
@@ -177,6 +205,15 @@ export const KiroConfigPanel = memo(function KiroConfigPanel({
       </div>
 
       {viewer && <KiroFileViewer filePath={viewer.filePath} title={viewer.title} onClose={closeViewer} />}
+      <KiroMcpManager
+        open={mcpManagerOpen}
+        servers={mcpServers}
+        activeWorkspace={activeWorkspace}
+        initialServer={editingMcp}
+        onClose={closeMcpManager}
+        onChanged={handleMcpChanged}
+        onOpenJson={openMcpJson}
+      />
     </>
   )
 })
