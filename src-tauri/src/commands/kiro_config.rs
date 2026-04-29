@@ -220,7 +220,7 @@ fn string_array(cfg: &Value, key: &str) -> Option<Vec<String>> {
 fn string_map(cfg: &Value, key: &str) -> Option<BTreeMap<String, String>> {
     cfg.get(key).and_then(|v| v.as_object()).map(|obj| {
         obj.iter()
-            .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+            .filter_map(|(k, v)| v.as_str().map(|s| (k.to_string(), s.to_string())))
             .collect()
     }).filter(|m: &BTreeMap<String, String>| !m.is_empty())
 }
@@ -260,11 +260,11 @@ fn load_mcp_file(file_path: &Path, enabled_file: bool, is_global: bool, out: &mu
         } else {
             "stdio".to_string()
         };
-        let disabled = cfg.get("disabled").and_then(|v| v.as_bool()).unwrap_or(false);
+        let disabled_in_config = cfg.get("disabled").and_then(|v| v.as_bool()).unwrap_or(false);
         let error = mcp_error(cfg, &transport);
         out.push(KiroMcpServer {
             name: name.clone(),
-            enabled: enabled_file && !disabled,
+            enabled: enabled_file && !disabled_in_config,
             transport,
             source: source.clone(),
             command: cfg.get("command").and_then(|v| v.as_str()).map(String::from),
@@ -334,8 +334,12 @@ fn normalize_mcp_config(mut config: Value) -> Result<Value, AppError> {
 
 fn write_mcp_server_to_path(path: &Path, server_name: &str, config: Value) -> Result<(), AppError> {
     let name = server_name.trim();
-    if name.is_empty() || name.contains('/') || name.contains('\\') {
-        return Err(AppError::Other("MCP server name must not be empty or contain path separators".to_string()));
+    if name.is_empty()
+        || name.contains('/')
+        || name.contains('\\')
+        || name.chars().any(|ch| ch == '\0' || ch.is_control())
+    {
+        return Err(AppError::Other("MCP server name must not be empty or contain path separators/control characters".to_string()));
     }
     let mut root = read_mcp_json(path)?;
     let servers = ensure_mcp_servers_object(&mut root)?;

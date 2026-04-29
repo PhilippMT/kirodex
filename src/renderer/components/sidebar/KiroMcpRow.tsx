@@ -34,7 +34,7 @@ export const McpRow = memo(function McpRow({ server, onEdit }: { server: KiroMcp
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
-                ipc.openUrl(server.oauthUrl!).catch(() => {})
+                ipc.openUrl(server.oauthUrl!).catch((err) => console.warn('[mcp] failed to open OAuth URL', err))
               }}
               className="shrink-0 rounded text-red-600 hover:text-red-500 dark:text-red-400"
               aria-label={`Authenticate ${server.name}`}

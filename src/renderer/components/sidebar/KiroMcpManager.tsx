@@ -136,7 +136,10 @@ export const KiroMcpManager = memo(function KiroMcpManager({
     if (!open) return
     setForm(serverToForm(initialServer, activeWorkspace))
     setError(null)
-    ipc.getMcpConfigPaths(activeWorkspace ?? undefined).then(setPaths).catch(() => setPaths(null))
+    ipc.getMcpConfigPaths(activeWorkspace ?? undefined).then(setPaths).catch((err) => {
+      console.warn('[mcp] failed to load config paths', err)
+      setPaths(null)
+    })
   }, [activeWorkspace, initialServer, open])
 
   const grouped = useMemo(() => ({
