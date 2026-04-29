@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.40.4] - 2026-04-29
+
+### Bug fixes
+
+- update mocks for kiroStore, taskStore, and SidebarFooter tests ([`7452775`](https://github.com/thabti/kirodex/commit/74527755203960e38c6d783d0424faf207f7bbea))
+
 ## [v0.40.3] - 2026-04-29
 
 ### Features
