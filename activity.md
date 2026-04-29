@@ -1,5 +1,11 @@
 # Activity Log
 
+## 2026-04-29 07:52 GST (Dubai)
+### Tests: Fix 14 failing unit tests across 3 test files
+Fixed test failures caused by source code evolving ahead of test mocks. kiroStore.test.ts needed `onKiroConfigChanged` added to the ipc mock (3 failures). taskStore.test.ts needed the `persistHistory` assertion updated from 3 to 6 args matching the new `saveThreads` signature (1 failure). SidebarFooter.test.tsx needed mocks for `jsDebugStore`, `useModifierKeys`, and `thread-memory` to prevent `measureMemory` crashing on undefined `tasks` (10 failures). All 822 tests now pass.
+
+**Modified:** `src/renderer/stores/kiroStore.test.ts`, `src/renderer/stores/taskStore.test.ts`, `src/renderer/components/sidebar/SidebarFooter.test.tsx`
+
 ## 2026-04-29 00:13 GST (Dubai)
 ### Kiro Watcher: Auto-refresh agents, skills, steering, and MCP when .kiro files change
 Added a file watcher using the `notify` crate that watches `~/.kiro` (global, always) and project `.kiro` directories (per-project, on demand). When files change, the Rust backend emits a `kiro-config-changed` Tauri event. The frontend's kiroStore listens for this event, invalidates the cached config, and re-fetches from disk. The sidebar panel and mention picker automatically reflect new/modified/deleted agents, skills, steering rules, and MCP servers without restarting the app.

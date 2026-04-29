@@ -5,6 +5,7 @@ vi.mock('@/lib/ipc', () => ({
     getKiroConfig: vi.fn().mockResolvedValue({ agents: [], skills: [], steeringRules: [], mcpServers: [] }),
     onMcpConnecting: vi.fn().mockReturnValue(() => {}),
     onMcpUpdate: vi.fn().mockReturnValue(() => {}),
+    onKiroConfigChanged: vi.fn().mockReturnValue(() => {}),
   },
 }))
 
