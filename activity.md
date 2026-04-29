@@ -1,5 +1,11 @@
 # Activity Log
 
+## 2026-04-29 14:06 GST (Dubai)
+### MCP Sidebar: Add global and project server configuration UI
+Added a structured MCP server manager to the Kiro sidebar for creating, editing, deleting, and disabling global or project MCP servers while keeping scoped `mcp.json` files as a JSON fallback. The backend now preserves Kiro CLI MCP keys (`env`, `headers`, `autoApprove`, `disabledTools`, transports, source scope) and exposes save/delete/path IPC commands; OAuth requests surface an authenticate action from the ACP extension URL.
+
+**Modified:** `src-tauri/src/commands/kiro_config.rs`, `src-tauri/src/lib.rs`, `src/renderer/components/sidebar/KiroConfigPanel.tsx`, `src/renderer/components/sidebar/KiroMcpManager.tsx`, `src/renderer/components/sidebar/KiroMcpRow.tsx`, `src/renderer/lib/ipc.ts`, `src/renderer/stores/kiroStore.test.ts`, `src/renderer/types/index.ts`, `activity.md`
+
 ## 2026-04-29 07:52 GST (Dubai)
 ### Tests: Fix 14 failing unit tests across 3 test files
 Fixed test failures caused by source code evolving ahead of test mocks. kiroStore.test.ts needed `onKiroConfigChanged` added to the ipc mock (3 failures). taskStore.test.ts needed the `persistHistory` assertion updated from 3 to 6 args matching the new `saveThreads` signature (1 failure). SidebarFooter.test.tsx needed mocks for `jsDebugStore`, `useModifierKeys`, and `thread-memory` to prevent `measureMemory` crashing on undefined `tasks` (10 failures). All 822 tests now pass.
